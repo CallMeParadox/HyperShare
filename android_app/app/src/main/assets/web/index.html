@@ -46,6 +46,27 @@
       </div>
     </div>
 
+    <!-- Real-time Speedometer & Active Transfer HUD (Visible in both Sender & Receiver modes) -->
+    <section class="speed-card" id="speedCard">
+      <div class="speed-metric">
+        <div class="speed-value" id="currentSpeed">0.0</div>
+        <div class="speed-unit">MB/s</div>
+      </div>
+      <div class="speed-details">
+        <div class="transfer-info">
+          <span id="transferFileName">⚡ آماده به کار (شبکه آماده انتقال فوق‌سریع)</span>
+          <span id="transferPercent"></span>
+        </div>
+        <div class="progress-bar-bg" id="progressBarBg" style="display: none;">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="transfer-stats" id="transferStats" style="display: none;">
+          <span id="transferredBytes"></span>
+          <span id="etaTime"></span>
+        </div>
+      </div>
+    </section>
+
     <!-- SENDER CONTAINER -->
     <div id="senderContainer">
       <!-- Sender Direct Wi-Fi Connection Banner -->
@@ -59,27 +80,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Real-time Speedometer & Active Transfer Bar -->
-      <section class="speed-card" id="speedCard">
-      <div class="speed-metric">
-        <div class="speed-value" id="currentSpeed">0.0</div>
-        <div class="speed-unit">MB/s</div>
-      </div>
-      <div class="speed-details">
-        <div class="transfer-info">
-          <span id="transferFileName">⚡ آماده به کار (هیچ دانلودی در جریان نیست)</span>
-          <span id="transferPercent"></span>
-        </div>
-        <div class="progress-bar-bg" id="progressBarBg" style="display: none;">
-          <div class="progress-bar-fill" id="progressBar"></div>
-        </div>
-        <div class="transfer-stats" id="transferStats" style="display: none;">
-          <span id="transferredBytes"></span>
-          <span id="etaTime"></span>
-        </div>
-      </div>
-    </section>
 
     <!-- Navigation Tabs -->
     <nav class="nav-tabs">

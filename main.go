@@ -188,6 +188,7 @@ func main() {
 	})
 	mux.HandleFunc("/api/download-all", engine.HandleDownloadAll(absDir))
 	mux.HandleFunc("/api/speedtest", engine.HandleSpeedTest)
+	mux.HandleFunc("/api/stats", engine.HandleStats)
 	mux.HandleFunc("/api/clipboard", engine.HandleClipboardAPI)
 	mux.HandleFunc("/api/upload", engine.HandleUpload(absUpload, absDir))
 

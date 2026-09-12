@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const transferFileName = document.getElementById('transferFileName');
   const transferPercent = document.getElementById('transferPercent');
   const progressBar = document.getElementById('progressBar');
+  const progressBarBg = document.getElementById('progressBarBg');
+  const transferStats = document.getElementById('transferStats');
   const transferredBytes = document.getElementById('transferredBytes');
   const etaTime = document.getElementById('etaTime');
   const networkStatus = document.getElementById('networkStatus');
@@ -57,6 +59,112 @@ document.addEventListener('DOMContentLoaded', () => {
       prompt('آدرس فرستنده را کپی کنید:', url);
     }
   });
+
+  // ----------------------------------------------------
+  // Global Real-Time Transfer Monitor (/api/stats)
+  // Synchronizes live transfer speed, progress and ETA
+  // across both Sender (Mobile) and Receiver (PC) screens!
+  // ----------------------------------------------------
+  let monitorInterval = null;
+  let lastTransferActive = false;
+  window.isManualSpeedActive = false;
+
+  function startActiveTransferMonitor() {
+    if (monitorInterval) clearInterval(monitorInterval);
+    monitorInterval = setInterval(async () => {
+      if (window.isManualSpeedActive) return;
+
+      try {
+        let stats = null;
+
+        // 1. Query local server stats
+        try {
+          const localRes = await fetch('/api/stats', { cache: 'no-store' });
+          if (localRes.ok) {
+            const ls = await localRes.json();
+            if (ls && ls.is_active) {
+              stats = ls;
+            }
+          }
+        } catch (e) {}
+
+        // 2. If receiver connected to remote sender and local is idle, query remote stats
+        if (!stats && currentSenderHost) {
+          try {
+            const remoteRes = await fetch(`${currentSenderHost}/api/stats`, { cache: 'no-store' });
+            if (remoteRes.ok) {
+              const rs = await remoteRes.json();
+              if (rs && rs.is_active) {
+                // If remote sender is "sending", from our perspective we are "receiving"
+                stats = {
+                  ...rs,
+                  direction: rs.direction === 'sending' ? 'receiving' : 'sending'
+                };
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (stats && stats.is_active) {
+          lastTransferActive = true;
+          const speed = stats.speed_mbps || 0;
+          const percent = stats.percent || 0;
+          const filename = stats.filename || 'فایل ناشناس';
+          const total = stats.total_bytes || 0;
+          const transferred = stats.transferred_bytes || 0;
+
+          if (currentSpeed) currentSpeed.textContent = speed.toFixed(1);
+          if (transferPercent) transferPercent.textContent = `${percent}%`;
+          if (progressBar) progressBar.style.width = `${percent}%`;
+          if (progressBarBg) progressBarBg.style.display = 'block';
+          if (transferStats) transferStats.style.display = 'flex';
+
+          if (transferFileName) {
+            if (stats.direction === 'sending') {
+              transferFileName.innerHTML = `📤 <strong>در حال ارسال به دستگاه مقابل:</strong> ${escapeHtml(filename)}`;
+            } else {
+              transferFileName.innerHTML = `📥 <strong>در حال دریافت:</strong> ${escapeHtml(filename)}`;
+            }
+          }
+
+          if (transferredBytes) {
+            if (total > 0) {
+              transferredBytes.textContent = `${formatBytes(transferred)} / ${formatBytes(total)}`;
+            } else {
+              transferredBytes.textContent = formatBytes(transferred);
+            }
+          }
+
+          if (etaTime) {
+            if (total > 0 && speed > 0) {
+              const remaining = Math.max(0, total - transferred);
+              const eta = remaining / (speed * 1024 * 1024);
+              etaTime.textContent = eta > 0 ? `ETA: ${Math.round(eta)} ثانیه` : 'تکمیل';
+            } else {
+              etaTime.textContent = '';
+            }
+          }
+        } else if (lastTransferActive) {
+          lastTransferActive = false;
+          if (currentSpeed) currentSpeed.textContent = '0.0';
+          if (transferPercent) transferPercent.textContent = '۱۰۰% (تکمیل شد)';
+          if (progressBar) progressBar.style.width = '100%';
+          if (etaTime) etaTime.textContent = 'انجام شد!';
+          setTimeout(() => {
+            if (!lastTransferActive && !window.isManualSpeedActive) {
+              if (transferFileName) transferFileName.textContent = '⚡ آماده به کار (شبکه آماده انتقال فوق‌سریع)';
+              if (transferPercent) transferPercent.textContent = '';
+              if (progressBarBg) progressBarBg.style.display = 'none';
+              if (transferStats) transferStats.style.display = 'none';
+            }
+          }, 2500);
+        }
+      } catch (err) {}
+    }, 400);
+  }
+
+  // Start background transfer monitor immediately
+  startActiveTransferMonitor();
 
   async function uploadFileDirectly(file, target = 'shared') {
     return new Promise((resolve) => {
@@ -289,12 +397,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  let latestReceiverFiles = [];
+
   async function pollReceiverFiles() {
     if (!currentSenderHost) return;
     try {
       const res = await fetch(`${currentSenderHost}/api/files`, { cache: 'no-store' });
       const files = await res.json();
       const safeFiles = Array.isArray(files) ? files : [];
+
+      latestReceiverFiles = safeFiles;
+      populateTurboSelect();
 
       const currentHash = safeFiles.map(f => `${f.name}:${f.size}`).join('|');
       if (currentHash !== lastReceiverFilesHash) {
@@ -342,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 👁️
               </button>
             ` : ''}
-            <a href="${downloadUrl}" download="${escapeHtml(file.name)}" class="btn-primary btn-sm glow-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+            <a href="${downloadUrl}" download="${escapeHtml(file.name)}" class="btn-primary btn-sm glow-btn dl-trigger-btn" data-name="${escapeHtml(file.name)}" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
               ⬇️ دریافت
             </a>
           </div>
@@ -357,10 +470,27 @@ document.addEventListener('DOMContentLoaded', () => {
         openPreview(url, type, title);
       });
     });
+
+    // Wire immediate feedback on download click
+    receiverFileList.querySelectorAll('.dl-trigger-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const name = e.currentTarget.dataset.name;
+        if (transferFileName) {
+          transferFileName.innerHTML = `📥 <strong>در حال آغاز دریافت:</strong> ${escapeHtml(name)}...`;
+        }
+        if (progressBarBg) progressBarBg.style.display = 'block';
+        if (progressBar) progressBar.style.width = '3%';
+      });
+    });
   }
 
   btnReceiverDownloadAll?.addEventListener('click', () => {
     if (!currentSenderHost) return;
+    if (transferFileName) {
+      transferFileName.innerHTML = `📥 <strong>در حال آغاز دریافت همه فایل‌ها (ZIP)...</strong>`;
+    }
+    if (progressBarBg) progressBarBg.style.display = 'block';
+    if (progressBar) progressBar.style.width = '3%';
     window.location.href = `${currentSenderHost}/api/download-all`;
   });
 
@@ -589,13 +719,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Populate Turbo Select Box
   function populateTurboSelect() {
     if (!turboFileSelect) return;
-    if (!Array.isArray(allFiles) || allFiles.length === 0) {
+    const fileSource = (activeRole === 'receiver' && latestReceiverFiles.length > 0) ? latestReceiverFiles : allFiles;
+    if (!Array.isArray(fileSource) || fileSource.length === 0) {
       turboFileSelect.innerHTML = '<option value="">هیچ فایلی موجود نیست</option>';
       btnStartTurbo.disabled = true;
       return;
     }
 
-    turboFileSelect.innerHTML = allFiles.map(f => 
+    turboFileSelect.innerHTML = fileSource.map(f => 
       `<option value="${f.name}" data-size="${f.size}">${f.name} (${f.human_size})</option>`
     ).join('');
     btnStartTurbo.disabled = false;
@@ -603,6 +734,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Download All as ZIP
   document.getElementById('btnDownloadAll')?.addEventListener('click', () => {
+    if (transferFileName) {
+      transferFileName.innerHTML = `📥 <strong>در حال ایجاد و دریافت همه فایل‌ها (ZIP)...</strong>`;
+    }
+    if (progressBarBg) progressBarBg.style.display = 'block';
+    if (progressBar) progressBar.style.width = '3%';
     window.location.href = '/api/download-all';
   });
 
@@ -658,6 +794,8 @@ document.addEventListener('DOMContentLoaded', () => {
   btnStartTurbo?.addEventListener('click', async () => {
     const selectedOption = turboFileSelect.selectedOptions[0];
     if (!selectedOption) return;
+
+    window.isManualSpeedActive = true;
 
     const filename = selectedOption.value;
     const totalSize = parseInt(selectedOption.dataset.size, 10);
@@ -771,6 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearInterval(speedInterval);
       alert(`خطا در دانلود توربو: ${err.message}`);
     } finally {
+      window.isManualSpeedActive = false;
       btnStartTurbo.disabled = false;
     }
   });
@@ -786,6 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const dialMeter = document.getElementById('dialMeter');
 
   btnRunSpeedTest?.addEventListener('click', async () => {
+    window.isManualSpeedActive = true;
     btnRunSpeedTest.disabled = true;
     benchResults.style.display = 'none';
 
@@ -842,6 +982,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearInterval(meterInterval);
       alert(`خطای بنچمارک: ${err.message}`);
     } finally {
+      window.isManualSpeedActive = false;
       btnRunSpeedTest.disabled = false;
       currentSpeed.textContent = '0.0';
     }

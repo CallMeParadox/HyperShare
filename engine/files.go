@@ -153,9 +153,17 @@ func HandleFileDownload(sharedDir string, isAttachment bool) http.HandlerFunc {
 			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 		}
 
+		GlobalTracker.StartTransfer(filename, "sending", info.Size())
+		defer GlobalTracker.EndTransfer()
+
+		trackingWriter := &TrackingResponseWriter{
+			ResponseWriter: w,
+			Tracker:        GlobalTracker,
+		}
+
 		// http.ServeContent handles all Range headers, 206 Partial Content,
 		// and chunked streaming with high performance.
-		http.ServeContent(w, r, filename, info.ModTime(), file)
+		http.ServeContent(trackingWriter, r, filename, info.ModTime(), file)
 	}
 }
 
@@ -167,14 +175,31 @@ func HandleDownloadAll(sharedDir string) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/zip")
 		w.Header().Set("Content-Disposition", `attachment; filename="HyperShare_All_Files.zip"`)
 
-		zipWriter := zip.NewWriter(w)
-		defer zipWriter.Close()
-
 		files, err := os.ReadDir(sharedDir)
 		if err != nil {
 			http.Error(w, "Cannot read directory", http.StatusInternalServerError)
 			return
 		}
+
+		var totalBytes int64
+		for _, entry := range files {
+			if !entry.IsDir() {
+				if fi, err := entry.Info(); err == nil {
+					totalBytes += fi.Size()
+				}
+			}
+		}
+
+		GlobalTracker.StartTransfer("HyperShare_All_Files.zip", "sending", totalBytes)
+		defer GlobalTracker.EndTransfer()
+
+		trackingWriter := &TrackingResponseWriter{
+			ResponseWriter: w,
+			Tracker:        GlobalTracker,
+		}
+
+		zipWriter := zip.NewWriter(trackingWriter)
+		defer zipWriter.Close()
 
 		buf := make([]byte, 2*1024*1024) // 2MB stream buffer
 

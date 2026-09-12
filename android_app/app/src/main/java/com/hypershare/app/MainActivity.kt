@@ -23,7 +23,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import android.app.DownloadManager
+import android.net.wifi.WifiManager
 import android.os.Environment
+import android.os.PowerManager
 import android.webkit.PermissionRequest
 import android.webkit.URLUtil
 import java.io.File
@@ -36,6 +38,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var loadingSpinner: ProgressBar
     private lateinit var hotspotManager: LocalOnlyHotspotManager
     private lateinit var embeddedServer: EmbeddedServer
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val backgroundExecutor = Executors.newSingleThreadExecutor()
@@ -102,6 +106,23 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webView)
         loadingSpinner = findViewById(R.id.loadingSpinner)
         hotspotManager = LocalOnlyHotspotManager(this)
+
+        // Ultra-high-performance Wi-Fi Lock and WakeLock to prevent 802.11 power saving throttling
+        try {
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HyperShare::MainWakeLock")
+            wakeLock?.acquire(4 * 60 * 60 * 1000L) // 4 hours max
+
+            val wifiManager = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+            wifiLock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "HyperShare::MainWifiLock")
+            } else {
+                wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "HyperShare::MainWifiLock")
+            }
+            wifiLock?.acquire()
+        } catch (e: Exception) {
+            Log.w("HyperShare", "Could not acquire WifiLock: ${e.message}")
+        }
 
         // 1. Start the embedded server (Shared Singleton)
         embeddedServer = EmbeddedServer.getInstance(applicationContext, 8080)
@@ -372,6 +393,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            wifiLock?.let { if (it.isHeld) it.release() }
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (e: Exception) {}
         if (isFinishing) {
             hotspotManager.stopHotspot()
         }

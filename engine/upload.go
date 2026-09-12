@@ -46,13 +46,27 @@ func HandleUpload(uploadDir string, optionalSharedDir ...string) http.HandlerFun
 				http.Error(w, fmt.Sprintf("Failed to open file: %v", err), http.StatusInternalServerError)
 				return
 			}
-			buf := make([]byte, 4*1024*1024)
-			_, copyErr := io.CopyBuffer(destFile, r.Body, buf)
-			destFile.Close()
-			if copyErr != nil {
-				http.Error(w, fmt.Sprintf("Failed to save file: %v", copyErr), http.StatusInternalServerError)
-				return
+			defer destFile.Close()
+
+			GlobalTracker.StartTransfer(safeName, "receiving", r.ContentLength)
+			defer GlobalTracker.EndTransfer()
+
+			buf := make([]byte, 2*1024*1024)
+			for {
+				n, readErr := r.Body.Read(buf)
+				if n > 0 {
+					destFile.Write(buf[:n])
+					GlobalTracker.UpdateProgress(int64(n))
+				}
+				if readErr != nil {
+					if readErr != io.EOF {
+						http.Error(w, fmt.Sprintf("Failed to save file: %v", readErr), http.StatusInternalServerError)
+						return
+					}
+					break
+				}
 			}
+
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"status":   "success",

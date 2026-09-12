@@ -78,17 +78,108 @@ class EmbeddedServer(
         } catch (e: Exception) {}
     }
 
+    // Real-time transfer throughput and progress monitor
+    object TransferTracker {
+        data class Stats(
+            val isActive: Boolean,
+            val direction: String,
+            val filename: String,
+            val totalBytes: Long,
+            val transferredBytes: Long,
+            val speedMBps: Double,
+            val percent: Int
+        )
+
+        private val activeCount = java.util.concurrent.atomic.AtomicInteger(0)
+        @Volatile private var currentFilename: String = ""
+        @Volatile private var currentDirection: String = ""
+        @Volatile private var currentTotalBytes: Long = 0L
+        @Volatile private var currentTransferredBytes: Long = 0L
+        @Volatile private var lastSpeedMBps: Double = 0.0
+
+        @Volatile private var lastSampleTime: Long = 0L
+        @Volatile private var lastSampleBytes: Long = 0L
+        @Volatile private var lastActivityTime: Long = 0L
+
+        fun startTransfer(filename: String, direction: String, totalBytes: Long) {
+            activeCount.incrementAndGet()
+            currentFilename = filename
+            currentDirection = direction
+            currentTotalBytes = totalBytes
+            currentTransferredBytes = 0L
+            val now = System.currentTimeMillis()
+            lastSampleTime = now
+            lastSampleBytes = 0L
+            lastActivityTime = now
+            lastSpeedMBps = 0.0
+        }
+
+        fun updateProgress(bytesAdded: Long) {
+            currentTransferredBytes += bytesAdded
+            val now = System.currentTimeMillis()
+            lastActivityTime = now
+            val elapsed = now - lastSampleTime
+            if (elapsed >= 350) {
+                val bytesDiff = currentTransferredBytes - lastSampleBytes
+                val seconds = elapsed / 1000.0
+                if (seconds > 0) {
+                    val instSpeed = (bytesDiff / (1024.0 * 1024.0)) / seconds
+                    lastSpeedMBps = if (lastSpeedMBps > 0.0) {
+                        (lastSpeedMBps * 0.35) + (instSpeed * 0.65)
+                    } else {
+                        instSpeed
+                    }
+                }
+                lastSampleTime = now
+                lastSampleBytes = currentTransferredBytes
+            }
+        }
+
+        fun endTransfer() {
+            if (activeCount.get() > 0) {
+                activeCount.decrementAndGet()
+            }
+            lastActivityTime = System.currentTimeMillis()
+        }
+
+        fun getStats(): Stats {
+            val now = System.currentTimeMillis()
+            val running = activeCount.get() > 0
+            val recent = running || (now - lastActivityTime < 2200 && currentTransferredBytes > 0)
+            val percent = if (currentTotalBytes > 0) {
+                ((currentTransferredBytes.toDouble() / currentTotalBytes.toDouble()) * 100).toInt().coerceIn(0, 100)
+            } else if (!running && recent) 100 else 0
+
+            return Stats(
+                isActive = recent,
+                direction = if (recent) currentDirection else "",
+                filename = if (recent) currentFilename else "",
+                totalBytes = if (recent) currentTotalBytes else 0L,
+                transferredBytes = if (recent) currentTransferredBytes else 0L,
+                speedMBps = if (running) (Math.round(lastSpeedMBps * 10.0) / 10.0) else 0.0,
+                percent = percent
+            )
+        }
+    }
+
     fun start() {
         if (isRunning) return
         isRunning = true
 
         threadPool.execute {
             try {
-                serverSocket = ServerSocket(port, 100, InetAddress.getByName("0.0.0.0"))
-                Log.i(TAG, "HyperShare Embedded Server started on port $port")
+                serverSocket = ServerSocket()
+                serverSocket?.reuseAddress = true
+                serverSocket?.receiveBufferSize = 2 * 1024 * 1024
+                serverSocket?.bind(java.net.InetSocketAddress("0.0.0.0", port), 200)
+                Log.i(TAG, "HyperShare Embedded Server started on port $port with 2MB TCP buffer")
 
                 while (isRunning) {
                     val client = serverSocket?.accept() ?: break
+                    client.tcpNoDelay = true
+                    client.soTimeout = 60000
+                    client.sendBufferSize = 2 * 1024 * 1024
+                    client.receiveBufferSize = 2 * 1024 * 1024
                     threadPool.execute {
                         handleClient(client)
                     }
@@ -152,7 +243,7 @@ class EmbeddedServer(
                 line = readAsciiLine(input)
             }
 
-            val output = socket.getOutputStream()
+            val output = BufferedOutputStream(socket.getOutputStream(), 256 * 1024)
 
             // Handle HTTP OPTIONS Preflight
             if (method == "OPTIONS") {
@@ -183,6 +274,12 @@ class EmbeddedServer(
 
             // APIs
             when {
+                path == "/api/stats" -> {
+                    val stats = TransferTracker.getStats()
+                    val json = """{"is_active":${stats.isActive},"direction":${quote(stats.direction)},"filename":${quote(stats.filename)},"total_bytes":${stats.totalBytes},"transferred_bytes":${stats.transferredBytes},"speed_mbps":${stats.speedMBps},"percent":${stats.percent}}"""
+                    sendResponse(output, 200, "OK", "application/json", json.toByteArray())
+                }
+
                 path == "/api/network" -> {
                     val ip = getLocalIpAddress()
                     val json = """{"primary_ip":"$ip","receiver_url":"http://$ip:$port","is_hotspot":true}"""
@@ -336,12 +433,15 @@ class EmbeddedServer(
         val targetDir = if (isTargetShared) getSharedDirectory() else getReceivedDirectory()
         val uploadedNames = mutableListOf<String>()
 
+        val safeUploadName = queryFilename ?: "فایل ارسالی"
+        TransferTracker.startTransfer(safeUploadName, "receiving", contentLength)
+
         try {
             if (!queryFilename.isNullOrEmpty()) {
                 val safeName = File(queryFilename).name
                 val destFile = File(targetDir, safeName)
                 FileOutputStream(destFile).use { fos ->
-                    val buffer = ByteArray(64 * 1024)
+                    val buffer = ByteArray(256 * 1024)
                     var remaining = contentLength
                     if (remaining > 0) {
                         while (remaining > 0) {
@@ -349,12 +449,14 @@ class EmbeddedServer(
                             val r = input.read(buffer, 0, toRead)
                             if (r == -1) break
                             fos.write(buffer, 0, r)
+                            TransferTracker.updateProgress(r.toLong())
                             remaining -= r
                         }
                     } else {
                         var r: Int
                         while (input.read(buffer).also { r = it } != -1) {
                             fos.write(buffer, 0, r)
+                            TransferTracker.updateProgress(r.toLong())
                         }
                     }
                 }
@@ -369,6 +471,8 @@ class EmbeddedServer(
             Log.e(TAG, "Upload failed: ${e.message}")
             val errJson = """{"status":"error","message":${quote(e.message ?: "Unknown upload error")}}"""
             sendResponse(output, 500, "Server Error", "application/json", errJson.toByteArray())
+        } finally {
+            TransferTracker.endTransfer()
         }
     }
 
@@ -488,6 +592,7 @@ class EmbeddedServer(
         rangeHeader: String?,
         output: OutputStream
     ) {
+        TransferTracker.startTransfer(filename, "sending", fileSize)
         try {
             if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
                 val rangeVal = rangeHeader.removePrefix("bytes=").trim()
@@ -516,13 +621,14 @@ class EmbeddedServer(
 
                 output.write(headerStr.toByteArray())
 
-                val buffer = ByteArray(64 * 1024)
+                val buffer = ByteArray(256 * 1024)
                 var remaining = length
                 while (remaining > 0) {
                     val toRead = if (remaining > buffer.size) buffer.size else remaining.toInt()
                     val read = stream.read(buffer, 0, toRead)
                     if (read == -1) break
                     output.write(buffer, 0, read)
+                    TransferTracker.updateProgress(read.toLong())
                     remaining -= read
                 }
                 output.flush()
@@ -538,14 +644,16 @@ class EmbeddedServer(
 
                 output.write(headerStr.toByteArray())
 
-                val buffer = ByteArray(64 * 1024)
+                val buffer = ByteArray(256 * 1024)
                 var read: Int
                 while (stream.read(buffer).also { read = it } != -1) {
                     output.write(buffer, 0, read)
+                    TransferTracker.updateProgress(read.toLong())
                 }
                 output.flush()
             }
         } finally {
+            TransferTracker.endTransfer()
             try { stream.close() } catch (e: Exception) {}
         }
     }
@@ -682,69 +790,83 @@ class EmbeddedServer(
     }
 
     private fun serveDownloadAll(output: OutputStream) {
-        val headerStr = "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: application/zip\r\n" +
-                "Content-Disposition: attachment; filename=\"HyperShare_All_Files.zip\"\r\n" +
-                "Access-Control-Allow-Origin: *\r\n" +
-                "Connection: close\r\n\r\n"
-        output.write(headerStr.toByteArray())
-
-        val zipOut = java.util.zip.ZipOutputStream(output)
-        val buffer = ByteArray(64 * 1024)
-
-        // Stream in-memory items
-        for (item in memorySharedItems) {
-            try {
-                val entry = java.util.zip.ZipEntry(item.name)
-                entry.time = System.currentTimeMillis()
-                zipOut.putNextEntry(entry)
-                if (item.uri != null) {
-                    context.contentResolver.openInputStream(item.uri)?.use { stream ->
-                        var r: Int
-                        while (stream.read(buffer).also { r = it } != -1) {
-                            zipOut.write(buffer, 0, r)
-                        }
-                    }
-                } else if (item.file != null && item.file.exists()) {
-                    FileInputStream(item.file).use { stream ->
-                        var r: Int
-                        while (stream.read(buffer).also { r = it } != -1) {
-                            zipOut.write(buffer, 0, r)
-                        }
-                    }
-                }
-                zipOut.closeEntry()
-            } catch (e: Exception) {
-                Log.e(TAG, "Zip entry error: ${e.message}")
-            }
-        }
-
-        // Stream physical files
         val dir = getSharedDirectory()
         val files = dir.listFiles() ?: emptyArray()
-        for (f in files) {
-            if (f.isFile && memorySharedItems.none { it.name == f.name }) {
+        val totalBytes = memorySharedItems.sumOf { it.size } +
+                files.filter { it.isFile && memorySharedItems.none { m -> m.name == it.name } }.sumOf { it.length() }
+
+        TransferTracker.startTransfer("HyperShare_All_Files.zip", "sending", totalBytes)
+
+        try {
+            val headerStr = "HTTP/1.1 200 OK\r\n" +
+                    "Content-Type: application/zip\r\n" +
+                    "Content-Disposition: attachment; filename=\"HyperShare_All_Files.zip\"\r\n" +
+                    "Access-Control-Allow-Origin: *\r\n" +
+                    "Connection: close\r\n\r\n"
+            output.write(headerStr.toByteArray())
+
+            val zipOut = java.util.zip.ZipOutputStream(output)
+            zipOut.setLevel(java.util.zip.Deflater.NO_COMPRESSION)
+            val buffer = ByteArray(256 * 1024)
+
+            // Stream in-memory items
+            for (item in memorySharedItems) {
                 try {
-                    val entry = java.util.zip.ZipEntry(f.name)
-                    entry.time = f.lastModified()
+                    val entry = java.util.zip.ZipEntry(item.name)
+                    entry.time = System.currentTimeMillis()
                     zipOut.putNextEntry(entry)
-                    FileInputStream(f).use { stream ->
-                        var r: Int
-                        while (stream.read(buffer).also { r = it } != -1) {
-                            zipOut.write(buffer, 0, r)
+                    if (item.uri != null) {
+                        context.contentResolver.openInputStream(item.uri)?.use { stream ->
+                            var r: Int
+                            while (stream.read(buffer).also { r = it } != -1) {
+                                zipOut.write(buffer, 0, r)
+                                TransferTracker.updateProgress(r.toLong())
+                            }
+                        }
+                    } else if (item.file != null && item.file.exists()) {
+                        FileInputStream(item.file).use { stream ->
+                            var r: Int
+                            while (stream.read(buffer).also { r = it } != -1) {
+                                zipOut.write(buffer, 0, r)
+                                TransferTracker.updateProgress(r.toLong())
+                            }
                         }
                     }
                     zipOut.closeEntry()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Zip file error: ${e.message}")
+                    Log.e(TAG, "Zip entry error: ${e.message}")
                 }
             }
-        }
 
-        try {
+            // Stream physical files
+            for (f in files) {
+                if (f.isFile && memorySharedItems.none { it.name == f.name }) {
+                    try {
+                        val entry = java.util.zip.ZipEntry(f.name)
+                        entry.time = f.lastModified()
+                        zipOut.putNextEntry(entry)
+                        FileInputStream(f).use { stream ->
+                            var r: Int
+                            while (stream.read(buffer).also { r = it } != -1) {
+                                zipOut.write(buffer, 0, r)
+                                TransferTracker.updateProgress(r.toLong())
+                            }
+                        }
+                        zipOut.closeEntry()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Zip file error: ${e.message}")
+                    }
+                }
+            }
+
             zipOut.finish()
             zipOut.flush()
-        } catch (e: Exception) {}
+            output.flush()
+        } catch (e: Exception) {
+            Log.e(TAG, "Download all error: ${e.message}")
+        } finally {
+            TransferTracker.endTransfer()
+        }
     }
 
     private fun serveSpeedTest(sizeMB: Int, output: OutputStream) {
@@ -759,7 +881,7 @@ class EmbeddedServer(
 
         output.write(headerStr.toByteArray())
 
-        val zeroChunk = ByteArray(64 * 1024)
+        val zeroChunk = ByteArray(256 * 1024)
         var written = 0L
         while (written < totalBytes) {
             val toWrite = if (totalBytes - written < zeroChunk.size) (totalBytes - written).toInt() else zeroChunk.size
