@@ -74,9 +74,12 @@
     <main class="content-area">
       <!-- TAB 1: Files List -->
       <section id="tab-files" class="tab-content active">
-        <div class="top-action-banner">
-          <button id="btnAddFiles" class="btn-primary glow-btn add-files-btn">
-            ➕ افزودن فیلم، عکس، برنامه یا آهنگ برای ارسال
+        <div class="top-action-banner" style="display: flex; gap: 8px;">
+          <button id="btnAddFiles" class="btn-primary glow-btn add-files-btn" style="flex: 1;">
+            ➕ افزودن فایل برای اشتراک و ارسال
+          </button>
+          <button id="btnClearAllFiles" class="btn-secondary danger-btn" title="پاک کردن تمام فایل‌های لیست" style="white-space: nowrap;">
+            🗑️ پاک کردن همه
           </button>
         </div>
 
@@ -191,24 +194,48 @@
         </div>
       </section>
 
-      <!-- TAB 5: Upload Files Back to Sender -->
+      <!-- TAB 5: Upload Files Directly to Other Device -->
       <section id="tab-upload" class="tab-content">
         <div class="card">
-          <h3>ارسال فایل به دستگاه مقابل</h3>
-          <p class="card-desc">فایل‌های مورد نظر خود را برای انتقال مستقیم انتخاب کنید.</p>
+          <div class="transfer-direction-guide">
+            <span class="guide-badge">📱 ⇄ 💻 انتقال دوطرفه</span>
+            <p class="guide-text">فایل‌هایی که در این بخش انتخاب می‌کنید مستقیماً با حداکثر سرعت ۵ گیگاهرتز به دستگاه مقابل فرستاده و روی حافظه آن ذخیره می‌شوند.</p>
+          </div>
 
           <div class="dropzone" id="dropzone">
             <div class="drop-icon">📤</div>
-            <div class="drop-text">کلیک کنید یا فایل‌ها را اینجا بکشید</div>
-            <input type="file" id="fileInput" multiple style="display: none;">
-            <button type="button" class="btn-primary glow-btn" id="btnPickFilesNative">
-              📁 انتخاب فایل‌ها از حافظه گوشی
-            </button>
+            <div class="drop-text">فایل‌ها را اینجا بکشید یا برای انتخاب کلیک کنید</div>
+            <input type="file" id="fileUploadInput" multiple style="display: none;">
+            <div class="upload-btn-row" style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px;">
+              <button type="button" class="btn-primary glow-btn" id="btnPickUploadFiles">
+                📁 انتخاب فایل‌ها
+              </button>
+              <button type="button" class="btn-secondary" id="btnPickPCFiles" style="display: none;">
+                💻 انتخاب از کامپیوتر
+              </button>
+            </div>
+          </div>
+
+          <div class="upload-queue-header" id="uploadQueueHeader" style="display: none; justify-content: space-between; align-items: center; margin-top: 16px;">
+            <span id="queueCountText" style="font-weight: 700; font-size: 13px;">فایل‌های آماده ارسال:</span>
+            <button id="btnClearUploadQueue" class="btn-secondary text-sm danger-btn" type="button">❌ لغو همه</button>
           </div>
 
           <div class="upload-queue" id="uploadQueue"></div>
-          <button id="btnUploadSubmit" class="btn-primary mt-3" style="display: none;">
-            شروع ارسال فایل‌ها
+
+          <!-- Upload Progress Box -->
+          <div class="upload-progress-box" id="uploadProgressBox" style="display: none; margin-top: 14px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span id="uploadStatusText" style="font-size: 13px; font-weight: bold;">در حال ارسال...</span>
+              <span id="uploadPercentText" style="font-size: 13px; color: var(--accent-cyan);">0%</span>
+            </div>
+            <div class="progress-bar-bg" style="display: block;">
+              <div class="progress-bar-fill" id="uploadProgressBar" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <button id="btnUploadSubmit" class="btn-primary mt-3 glow-btn" style="display: none; width: 100%;">
+            🚀 شروع ارسال فایل‌ها به دستگاه مقابل
           </button>
         </div>
       </section>

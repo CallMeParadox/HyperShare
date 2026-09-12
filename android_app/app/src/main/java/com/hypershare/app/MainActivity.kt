@@ -74,7 +74,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (uris.isNotEmpty()) {
-                copyUrisToSharedDir(uris)
+                registerUrisForSharing(uris)
             }
         }
     }
@@ -198,45 +198,56 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun copyUrisToSharedDir(uris: List<Uri>) {
-        Toast.makeText(this, "در حال افزودن ${uris.size} فایل به لیست ارسال...", Toast.LENGTH_SHORT).show()
-
+    private fun registerUrisForSharing(uris: List<Uri>) {
         backgroundExecutor.execute {
-            val sharedDir = File(getExternalFilesDir(null), "shared")
-            if (!sharedDir.exists()) sharedDir.mkdirs()
-
-            var count = 0
+            val items = mutableListOf<EmbeddedServer.SharedItem>()
             for (uri in uris) {
                 try {
-                    val filename = getFileName(uri) ?: "shared_file_${System.currentTimeMillis()}"
-                    val destFile = File(sharedDir, filename)
+                    val (name, size) = getFileInfo(uri)
+                    val cat = getFileCategory(name)
+                    val humanSize = embeddedServer.formatBytes(size)
 
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        FileOutputStream(destFile).use { output ->
-                            input.copyTo(output, bufferSize = 64 * 1024)
-                        }
-                    }
-                    count++
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (e: Exception) {}
+
+                    items.add(
+                        EmbeddedServer.SharedItem(
+                            name = name,
+                            size = size,
+                            humanSize = humanSize,
+                            category = cat,
+                            uri = uri
+                        )
+                    )
                 } catch (e: Exception) {
-                    Log.e("HyperShare", "Error copying file: ${e.message}")
+                    Log.e("HyperShare", "Error processing uri: ${e.message}")
                 }
             }
 
+            embeddedServer.addSharedItems(items)
+
             mainHandler.post {
-                Toast.makeText(this, "$count فایل با موفقیت اضافه شد", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "${items.size} فایل به لیست اضافه شد", Toast.LENGTH_SHORT).show()
                 webView.evaluateJavascript("if(window.loadFiles) window.loadFiles();", null)
             }
         }
     }
 
-    private fun getFileName(uri: Uri): String? {
+    private fun getFileInfo(uri: Uri): Pair<String, Long> {
         var name: String? = null
+        var size: Long = 0L
         if (uri.scheme == "content") {
             val cursor = contentResolver.query(uri, null, null, null, null)
             cursor?.use {
                 if (it.moveToFirst()) {
-                    val idx = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (idx != -1) name = it.getString(idx)
+                    val nameIdx = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx != -1) name = it.getString(nameIdx)
+                    val sizeIdx = it.getColumnIndex(OpenableColumns.SIZE)
+                    if (sizeIdx != -1) size = it.getLong(sizeIdx)
                 }
             }
         }
@@ -244,9 +255,21 @@ class MainActivity : AppCompatActivity() {
             name = uri.path?.let { p ->
                 val cut = p.lastIndexOf('/')
                 if (cut != -1) p.substring(cut + 1) else p
-            }
+            } ?: "file_${System.currentTimeMillis()}"
         }
-        return name
+        return Pair(name!!, size)
+    }
+
+    private fun getFileCategory(name: String): String {
+        val lower = name.lowercase()
+        return when {
+            lower.endsWith(".mp4") || lower.endsWith(".mkv") || lower.endsWith(".mov") || lower.endsWith(".avi") || lower.endsWith(".webm") || lower.endsWith(".3gp") -> "video"
+            lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp") || lower.endsWith(".gif") || lower.endsWith(".svg") -> "image"
+            lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".flac") || lower.endsWith(".aac") -> "audio"
+            lower.endsWith(".apk") || lower.endsWith(".aab") || lower.endsWith(".xapk") -> "app"
+            lower.endsWith(".zip") || lower.endsWith(".rar") || lower.endsWith(".7z") || lower.endsWith(".tar") || lower.endsWith(".gz") -> "archive"
+            else -> "document"
+        }
     }
 
     fun start5GHzHotspot() {

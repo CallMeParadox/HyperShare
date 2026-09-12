@@ -2,14 +2,19 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 
 	"hypershare/engine"
 )
@@ -38,13 +43,6 @@ func main() {
 		log.Fatalf("Invalid upload directory: %v", err)
 	}
 	os.MkdirAll(absUpload, 0755)
-
-	// Create a sample welcome file if share directory is empty
-	entries, _ := os.ReadDir(absDir)
-	if len(entries) == 0 {
-		sampleFile := filepath.Join(absDir, "Welcome_to_HyperShare.txt")
-		os.WriteFile(sampleFile, []byte("🎉 به هایپرشیر (HyperShare) خوش آمدید!\nاین فایل نمونه با سرعت فضایی و بدون نیاز به اینترنت یا مودم از طریق باند 5GHz منتقل شده است."), 0644)
-	}
 
 	// Detect Network and IPs
 	netInfo, err := engine.GetNetworkInfo(*portFlag)
@@ -87,6 +85,39 @@ func main() {
 	})
 
 	mux.HandleFunc("/api/files", engine.HandleFilesList(absDir))
+	mux.HandleFunc("/api/files/delete", engine.HandleFileDelete(absDir))
+
+	// Windows PC File Dialog API
+	mux.HandleFunc("/api/pick-pc-files", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodOptions {
+			return
+		}
+
+		psScript := `Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.OpenFileDialog; $f.Multiselect = $true; $f.Title = 'انتخاب فایل‌ها برای اشتراک در هایپرشیر'; if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $f.FileNames | ForEach-Object { Write-Output $_ } }`
+		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", psScript)
+		out, err := cmd.Output()
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": "error", "count": 0, "message": err.Error()})
+			return
+		}
+
+		lines := strings.Split(strings.TrimSpace(string(out)), "\r\n")
+		count := 0
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			dest := filepath.Join(absDir, filepath.Base(line))
+			if copyFile(line, dest) == nil {
+				count++
+			}
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "count": count})
+	})
+
 	mux.HandleFunc("/api/download/", func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/download")
 		engine.HandleFileDownload(absDir, true)(w, r)
@@ -110,16 +141,48 @@ func main() {
 
 	// Static Web Assets & Captive Portal Interceptor
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Intercept Android/iOS connectivity probes to keep offline 5GHz connection stable
 		if engine.HandleCaptivePortal(w, r) {
 			return
 		}
 		fileServer.ServeHTTP(w, r)
 	})
 
+	// Auto-launch browser on Windows PC
+	go func() {
+		time.Sleep(600 * time.Millisecond)
+		openURL(fmt.Sprintf("http://localhost:%d", *portFlag))
+	}()
+
 	serverAddr := fmt.Sprintf("0.0.0.0:%d", *portFlag)
-	log.Printf("Server listening on %s...", serverAddr)
+	log.Printf("HyperShare listening on %s (Opening browser)...", serverAddr)
 	if err := http.ListenAndServe(serverAddr, mux); err != nil {
 		log.Fatalf("HTTP server error: %v", err)
 	}
+}
+
+func openURL(url string) {
+	if runtime.GOOS == "windows" {
+		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	} else if runtime.GOOS == "darwin" {
+		exec.Command("open", url).Start()
+	} else {
+		exec.Command("xdg-open", url).Start()
+	}
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }

@@ -16,3 +16,10 @@ Thumbs.db
 # Shared temp files
 received/*
 !received/.gitkeep
+shared/*
+!shared/.gitkeep
+
+# Binaries
+*.apk
+*.aab
+*.exe

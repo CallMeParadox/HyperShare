@@ -58,20 +58,33 @@ jobs:
         name: HyperShare-Signed-APK
         path: android_app/app/build/outputs/apk/release/*.apk
 
-    - name: Create GitHub Release with APK & AAB
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Build Windows PC Executable (HyperShare_PC.exe)
+      run: |
+        GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o HyperShare_PC.exe main.go
+
+    - name: Create GitHub Release with APK, AAB & PC App
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
-        tag_name: v1.0.3
-        name: "HyperShare v1.0.3 (Status Bar & Idle UI Fix)"
+        tag_name: v1.0.4
+        name: "HyperShare v1.0.4 (Zero-Copy Instant File Pick, Bi-directional & PC App)"
         body: |
-          ### ⚡ HyperShare v1.0.3 - UI & Notification Polish
-          - **Fixed Status Bar Icon**: Replaced system download/upload arrow with app icon so users don't think an endless download is occurring.
-          - **Fixed Idle Progress Bar**: Hidden idle progress bars to avoid confusion when no transfer is happening.
-          - **app-release.apk**: Universal Signed APK (Ready to install)
-          - **app-release.aab**: Signed Android App Bundle (Google Play Console)
+          ### ⚡ HyperShare v1.0.4 - Major Upgrade
+          - **Instant Zero-Copy File Selection**: Files appear on screen in milliseconds without heavy copying or disk caching.
+          - **Bidirectional Transfer (/api/upload)**: Full 5GHz streaming upload from PC/browser directly into device storage with live progress.
+          - **Cancel & Delete Controls**: Remove individual files or clear entire queues on both sharing and upload tabs.
+          - **HyperShare PC App**: Standalone Windows executable (`HyperShare_PC.exe`) with auto-browser launch and native Windows file chooser.
+          - **app-release.apk**: Universal Signed APK (Android phone install)
+          - **app-release.aab**: Official Google Play Store bundle
+          - **HyperShare_PC.exe**: Windows PC desktop app
         files: |
           android_app/app/build/outputs/apk/release/*.apk
           android_app/app/build/outputs/bundle/release/*.aab
+          HyperShare_PC.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

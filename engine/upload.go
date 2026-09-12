@@ -32,6 +32,31 @@ func HandleUpload(uploadDir string) http.HandlerFunc {
 			return
 		}
 
+		// Check if direct streaming upload via query param ?name=...
+		if queryName := r.URL.Query().Get("name"); queryName != "" {
+			safeName := filepath.Base(queryName)
+			destPath := filepath.Join(uploadDir, safeName)
+			destFile, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to open file: %v", err), http.StatusInternalServerError)
+				return
+			}
+			buf := make([]byte, 4*1024*1024)
+			_, copyErr := io.CopyBuffer(destFile, r.Body, buf)
+			destFile.Close()
+			if copyErr != nil {
+				http.Error(w, fmt.Sprintf("Failed to save file: %v", copyErr), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status":   "success",
+				"uploaded": []string{safeName},
+				"count":    1,
+			})
+			return
+		}
+
 		// Parse multipart form (up to 64MB in RAM, rest to disk temp files)
 		reader, err := r.MultipartReader()
 		if err != nil {

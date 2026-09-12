@@ -131,6 +131,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <a href="${file.downloadURL}" class="action-icon-btn dl-btn" download="${file.name}">
               ⬇️ دریافت
             </a>
+            <button class="action-icon-btn delete-btn danger-icon-btn" data-id="${file.id || ''}" data-name="${file.name}" title="حذف از لیست">
+              🗑️
+            </button>
           </div>
         </div>
       `;
@@ -141,6 +144,21 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', (e) => {
         const { url, type, title } = e.currentTarget.dataset;
         openPreview(url, type, title);
+      });
+    });
+
+    // Attach delete listeners
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const { id, name } = e.currentTarget.dataset;
+        if (confirm(`آیا مطمئنید فایل "${name}" از لیست ارسالی‌ها حذف شود؟`)) {
+          await fetch('/api/files/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, name })
+          });
+          loadFiles();
+        }
       });
     });
   }
@@ -175,6 +193,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Download All as ZIP
   document.getElementById('btnDownloadAll')?.addEventListener('click', () => {
     window.location.href = '/api/download-all';
+  });
+
+  // Clear All Files
+  document.getElementById('btnClearAllFiles')?.addEventListener('click', async () => {
+    if (allFiles.length === 0) return;
+    if (confirm('آیا می‌خواهید تمام فایل‌ها را از لیست ارسالی‌ها پاک کنید؟')) {
+      await fetch('/api/files/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true })
+      });
+      loadFiles();
+    }
   });
 
   // Media Preview Modal
@@ -446,16 +477,71 @@ document.addEventListener('DOMContentLoaded', () => {
     return div.innerHTML;
   }
 
+  function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
   // ----------------------------------------------------
-  // Reverse File Upload (Web to Sender)
+  // Bidirectional File Upload (Stream Direct with Live Progress)
   // ----------------------------------------------------
   const dropzone = document.getElementById('dropzone');
   const uploadQueue = document.getElementById('uploadQueue');
   const btnUploadSubmit = document.getElementById('btnUploadSubmit');
+  const fileUploadInput = document.getElementById('fileUploadInput');
+  const btnPickUploadFiles = document.getElementById('btnPickUploadFiles');
+  const btnPickPCFiles = document.getElementById('btnPickPCFiles');
+  const btnClearUploadQueue = document.getElementById('btnClearUploadQueue');
+  const uploadQueueHeader = document.getElementById('uploadQueueHeader');
+  const queueCountText = document.getElementById('queueCountText');
+  const uploadProgressBox = document.getElementById('uploadProgressBox');
+  const uploadProgressBar = document.getElementById('uploadProgressBar');
+  const uploadStatusText = document.getElementById('uploadStatusText');
+  const uploadPercentText = document.getElementById('uploadPercentText');
+
   let selectedUploadFiles = [];
 
-  fileInput?.addEventListener('change', (e) => {
-    selectedUploadFiles = Array.from(e.target.files);
+  btnPickUploadFiles?.addEventListener('click', () => {
+    fileUploadInput?.click();
+  });
+
+  // Check if PC file picker is supported by server (when running on Windows)
+  fetch('/api/network')
+    .then(r => r.json())
+    .then(net => {
+      if (!window.AndroidBridge && btnPickPCFiles) {
+        btnPickPCFiles.style.display = 'inline-flex';
+      }
+    })
+    .catch(() => {});
+
+  btnPickPCFiles?.addEventListener('click', async () => {
+    try {
+      btnPickPCFiles.disabled = true;
+      const res = await fetch('/api/pick-pc-files', { method: 'POST' });
+      const data = await res.json();
+      if (data.count > 0) {
+        alert(`✅ ${data.count} فایل از کامپیوتر به لیست اشتراک اضافه شد!`);
+        loadFiles();
+      }
+    } catch (err) {
+      alert('انتخاب فایل کامپیوتر: ' + err.message);
+    } finally {
+      btnPickPCFiles.disabled = false;
+    }
+  });
+
+  fileUploadInput?.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(nf => {
+      if (!selectedUploadFiles.some(f => f.name === nf.name && f.size === nf.size)) {
+        selectedUploadFiles.push(nf);
+      }
+    });
+    fileUploadInput.value = '';
     renderUploadQueue();
   });
 
@@ -464,51 +550,107 @@ document.addEventListener('DOMContentLoaded', () => {
   dropzone?.addEventListener('drop', (e) => {
     e.preventDefault();
     dropzone.style.borderColor = 'rgba(0, 240, 255, 0.3)';
-    selectedUploadFiles = Array.from(e.dataTransfer.files);
+    const files = Array.from(e.dataTransfer.files);
+    files.forEach(nf => {
+      if (!selectedUploadFiles.some(f => f.name === nf.name && f.size === nf.size)) {
+        selectedUploadFiles.push(nf);
+      }
+    });
     renderUploadQueue();
   });
 
   function renderUploadQueue() {
     if (selectedUploadFiles.length === 0) {
       uploadQueue.innerHTML = '';
+      if (uploadQueueHeader) uploadQueueHeader.style.display = 'none';
       btnUploadSubmit.style.display = 'none';
       return;
     }
 
-    uploadQueue.innerHTML = selectedUploadFiles.map(f => `
+    if (uploadQueueHeader) uploadQueueHeader.style.display = 'flex';
+    if (queueCountText) queueCountText.textContent = `${selectedUploadFiles.length} فایل آماده ارسال:`;
+    btnUploadSubmit.style.display = 'block';
+
+    uploadQueue.innerHTML = selectedUploadFiles.map((f, idx) => `
       <div class="file-card">
-        <div class="file-title">${f.name}</div>
-        <div class="file-sub">${(f.size / (1024*1024)).toFixed(2)} MB</div>
+        <div class="file-icon">📄</div>
+        <div class="file-meta">
+          <div class="file-title" title="${f.name}">${f.name}</div>
+          <div class="file-sub">${formatBytes(f.size)}</div>
+        </div>
+        <button type="button" class="action-icon-btn remove-queue-btn" data-index="${idx}" title="لغو این فایل">
+          ❌
+        </button>
       </div>
     `).join('');
-    btnUploadSubmit.style.display = 'block';
+
+    document.querySelectorAll('.remove-queue-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.currentTarget.dataset.index, 10);
+        selectedUploadFiles.splice(idx, 1);
+        renderUploadQueue();
+      });
+    });
   }
+
+  btnClearUploadQueue?.addEventListener('click', () => {
+    selectedUploadFiles = [];
+    renderUploadQueue();
+  });
 
   btnUploadSubmit?.addEventListener('click', async () => {
     if (selectedUploadFiles.length === 0) return;
 
-    const formData = new FormData();
-    selectedUploadFiles.forEach(f => formData.append('files', f));
-
     btnUploadSubmit.disabled = true;
-    btnUploadSubmit.textContent = 'در حال ارسال...';
+    if (uploadProgressBox) uploadProgressBox.style.display = 'block';
 
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const result = await res.json();
-      alert(`با موفقیت ${result.count} فایل ارسال شد!`);
-      selectedUploadFiles = [];
-      renderUploadQueue();
-      loadFiles();
-    } catch (err) {
-      alert(`خطا در ارسال فایل: ${err.message}`);
-    } finally {
-      btnUploadSubmit.disabled = false;
-      btnUploadSubmit.textContent = 'شروع ارسال فایل‌ها';
+    let successCount = 0;
+    const totalFiles = selectedUploadFiles.length;
+
+    for (let i = 0; i < totalFiles; i++) {
+      const file = selectedUploadFiles[i];
+      if (uploadStatusText) {
+        uploadStatusText.textContent = `در حال ارسال (${i + 1}/${totalFiles}): ${file.name}`;
+      }
+
+      try {
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `/api/upload?name=${encodeURIComponent(file.name)}&size=${file.size}`);
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const percent = Math.round((e.loaded / e.total) * 100);
+              if (uploadProgressBar) uploadProgressBar.style.width = `${percent}%`;
+              if (uploadPercentText) {
+                uploadPercentText.textContent = `${percent}% (${(e.loaded/(1024*1024)).toFixed(1)} / ${(e.total/(1024*1024)).toFixed(1)} MB)`;
+              }
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              successCount++;
+              resolve();
+            } else {
+              reject(new Error(`کد خطا: ${xhr.status}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('خطای شبکه در حین ارسال'));
+          xhr.send(file);
+        });
+      } catch (err) {
+        alert(`خطا در ارسال فایل ${file.name}: ${err.message}`);
+      }
     }
+
+    if (uploadProgressBox) uploadProgressBox.style.display = 'none';
+    btnUploadSubmit.disabled = false;
+    alert(`✅ ${successCount} فایل با موفقیت به دستگاه مقابل ارسال و ذخیره شد!`);
+    selectedUploadFiles = [];
+    renderUploadQueue();
+    loadFiles();
   });
 
   // ----------------------------------------------------

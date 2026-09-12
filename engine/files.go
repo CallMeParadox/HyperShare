@@ -212,3 +212,36 @@ func HandleDownloadAll(sharedDir string) http.HandlerFunc {
 		}
 	}
 }
+
+// HandleFileDelete deletes a specific file or clears all files from shared directory.
+func HandleFileDelete(sharedDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		var payload struct {
+			Name string `json:"name"`
+			All  bool   `json:"all"`
+		}
+		json.NewDecoder(r.Body).Decode(&payload)
+
+		if payload.All {
+			entries, _ := os.ReadDir(sharedDir)
+			for _, entry := range entries {
+				os.Remove(filepath.Join(sharedDir, entry.Name()))
+			}
+		} else if payload.Name != "" {
+			safeName := filepath.Base(payload.Name)
+			os.Remove(filepath.Join(sharedDir, safeName))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
