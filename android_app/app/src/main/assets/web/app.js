@@ -62,6 +62,330 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // ----------------------------------------------------
+  // Role Selector & Receiver Module (فرستنده / گیرنده)
+  // ----------------------------------------------------
+  const btnRoleSender = document.getElementById('btnRoleSender');
+  const btnRoleReceiver = document.getElementById('btnRoleReceiver');
+  const senderContainer = document.getElementById('senderContainer');
+  const receiverContainer = document.getElementById('receiverContainer');
+  const roleModal = document.getElementById('roleModal');
+  const choiceSender = document.getElementById('choiceSender');
+  const choiceReceiver = document.getElementById('choiceReceiver');
+
+  // Receiver DOM elements
+  const inputSenderHost = document.getElementById('inputSenderHost');
+  const btnConnectSender = document.getElementById('btnConnectSender');
+  const btnAutoScanSender = document.getElementById('btnAutoScanSender');
+  const btnOpenScanner = document.getElementById('btnOpenScanner');
+  const receiverConnActions = document.getElementById('receiverConnActions');
+  const receiverConnectedBar = document.getElementById('receiverConnectedBar');
+  const connectedSenderHost = document.getElementById('connectedSenderHost');
+  const btnDisconnectSender = document.getElementById('btnDisconnectSender');
+  const btnReceiverDownloadAll = document.getElementById('btnReceiverDownloadAll');
+  const receiverFileList = document.getElementById('receiverFileList');
+  const receiverFilesCount = document.getElementById('receiverFilesCount');
+  const receiverStatusTitle = document.getElementById('receiverStatusTitle');
+  const receiverStatusSubtitle = document.getElementById('receiverStatusSubtitle');
+  const receiverPulseDot = document.getElementById('receiverPulseDot');
+
+  // Camera Scanner Elements
+  const cameraScanModal = document.getElementById('cameraScanModal');
+  const cameraModalClose = document.getElementById('cameraModalClose');
+  const btnCancelCamera = document.getElementById('btnCancelCamera');
+  const cameraVideo = document.getElementById('cameraVideo');
+  const cameraScanStatus = document.getElementById('cameraScanStatus');
+  let cameraStream = null;
+  let cameraScanInterval = null;
+
+  let activeRole = 'sender';
+  let currentSenderHost = '';
+  let receiverPollTimer = null;
+  let lastReceiverFilesHash = '';
+
+  function setRole(role) {
+    activeRole = role;
+    if (role === 'sender') {
+      btnRoleSender?.classList.add('active');
+      btnRoleReceiver?.classList.remove('active');
+      if (senderContainer) senderContainer.style.display = 'block';
+      if (receiverContainer) receiverContainer.style.display = 'none';
+      stopReceiverSync();
+      loadFiles();
+    } else {
+      btnRoleReceiver?.classList.add('active');
+      btnRoleSender?.classList.remove('active');
+      if (senderContainer) senderContainer.style.display = 'none';
+      if (receiverContainer) receiverContainer.style.display = 'block';
+      if (!currentSenderHost) {
+        autoDiscoverSender();
+      }
+    }
+  }
+
+  btnRoleSender?.addEventListener('click', () => setRole('sender'));
+  btnRoleReceiver?.addEventListener('click', () => setRole('receiver'));
+
+  choiceSender?.addEventListener('click', () => {
+    if (roleModal) roleModal.style.display = 'none';
+    setRole('sender');
+  });
+
+  choiceReceiver?.addEventListener('click', () => {
+    if (roleModal) roleModal.style.display = 'none';
+    setRole('receiver');
+  });
+
+  // Check if role modal should be shown on startup
+  const hasVisited = sessionStorage.getItem('hypershare_visited');
+  if (!hasVisited && roleModal) {
+    roleModal.style.display = 'flex';
+    sessionStorage.setItem('hypershare_visited', 'true');
+  }
+
+  // Auto-discover sender
+  async function autoDiscoverSender() {
+    if (receiverStatusTitle) receiverStatusTitle.textContent = 'در حال جستجوی فرستنده در شبکه...';
+    if (receiverPulseDot) receiverPulseDot.style.background = '#ffbb00';
+
+    // 1. Try PC backend /api/find-sender
+    try {
+      const res = await fetch('/api/find-sender');
+      const data = await res.json();
+      if (data.found && data.sender_url) {
+        connectToSender(data.sender_url);
+        return;
+      }
+    } catch (e) {}
+
+    // 2. Client-side candidate probe
+    const candidates = [
+      'http://192.168.43.1:8080',  // Android default hotspot
+      'http://192.168.137.1:8080', // Windows default hotspot
+      'http://192.168.1.1:8080',
+      'http://192.168.0.1:8080',
+      'http://172.20.10.1:8080'
+    ];
+
+    for (const cand of candidates) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600);
+        const r = await fetch(`${cand}/api/network`, { signal: controller.signal, mode: 'cors' });
+        clearTimeout(timeoutId);
+        if (r.ok) {
+          connectToSender(cand);
+          return;
+        }
+      } catch (err) {}
+    }
+
+    if (receiverStatusTitle) receiverStatusTitle.textContent = 'دستگاه فرستنده را انتخاب کنید';
+    if (receiverStatusSubtitle) receiverStatusSubtitle.textContent = 'آدرس وای‌فای نمایش داده شده روی گوشی/دستگاه فرستنده را وارد کنید یا اسکن بارکد را بزنید:';
+    if (receiverPulseDot) receiverPulseDot.style.background = '#00f0ff';
+    if (inputSenderHost && !inputSenderHost.value) {
+      inputSenderHost.value = 'http://192.168.43.1:8080';
+    }
+  }
+
+  btnAutoScanSender?.addEventListener('click', () => {
+    autoDiscoverSender();
+  });
+
+  btnConnectSender?.addEventListener('click', () => {
+    const raw = inputSenderHost?.value.trim();
+    if (!raw) return alert('لطفاً آدرس فرستنده را وارد کنید.');
+    let url = raw;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `http://${url}`;
+    }
+    connectToSender(url);
+  });
+
+  btnDisconnectSender?.addEventListener('click', () => {
+    stopReceiverSync();
+    currentSenderHost = '';
+    lastReceiverFilesHash = '';
+    if (receiverConnectedBar) receiverConnectedBar.style.display = 'none';
+    if (receiverConnActions) receiverConnActions.style.display = 'block';
+    if (receiverStatusTitle) receiverStatusTitle.textContent = 'اتصال قطع شد';
+    if (receiverStatusSubtitle) receiverStatusSubtitle.textContent = 'می‌توانید به دستگاه فرستنده دیگری متصل شوید.';
+    if (receiverPulseDot) receiverPulseDot.style.background = '#8a99ad';
+    if (receiverFileList) {
+      receiverFileList.innerHTML = '<div class="empty-state"><p>هنوز به دستگاه فرستنده متصل نشده‌اید.</p></div>';
+    }
+    if (receiverFilesCount) receiverFilesCount.textContent = '۰ فایل';
+  });
+
+  function connectToSender(hostUrl) {
+    currentSenderHost = hostUrl.replace(/\/+$/, '');
+    if (receiverConnActions) receiverConnActions.style.display = 'none';
+    if (receiverConnectedBar) receiverConnectedBar.style.display = 'flex';
+    if (connectedSenderHost) connectedSenderHost.textContent = currentSenderHost;
+    if (receiverStatusTitle) receiverStatusTitle.textContent = '🟢 متصل به دستگاه فرستنده';
+    if (receiverStatusSubtitle) receiverStatusSubtitle.textContent = 'فایل‌های ارسالی فرستنده به صورت بلادرنگ همگام‌سازی می‌شوند:';
+    if (receiverPulseDot) receiverPulseDot.style.background = 'var(--accent-green)';
+
+    startReceiverSync();
+  }
+
+  function startReceiverSync() {
+    stopReceiverSync();
+    pollReceiverFiles();
+    receiverPollTimer = setInterval(pollReceiverFiles, 1500); // 1.5s real-time poll
+  }
+
+  function stopReceiverSync() {
+    if (receiverPollTimer) {
+      clearInterval(receiverPollTimer);
+      receiverPollTimer = null;
+    }
+  }
+
+  async function pollReceiverFiles() {
+    if (!currentSenderHost) return;
+    try {
+      const res = await fetch(`${currentSenderHost}/api/files`, { cache: 'no-store' });
+      const files = await res.json();
+      const safeFiles = Array.isArray(files) ? files : [];
+
+      const currentHash = safeFiles.map(f => `${f.name}:${f.size}`).join('|');
+      if (currentHash !== lastReceiverFilesHash) {
+        lastReceiverFilesHash = currentHash;
+        renderReceiverFilesList(safeFiles);
+      }
+    } catch (err) {
+      console.warn('Poll sender files failed:', err);
+    }
+  }
+
+  function renderReceiverFilesList(files) {
+    if (!receiverFileList) return;
+    if (receiverFilesCount) receiverFilesCount.textContent = `${files.length} فایل`;
+
+    if (files.length === 0) {
+      receiverFileList.innerHTML = `
+        <div class="empty-state">
+          <p>دستگاه فرستنده هنوز فایلی برای ارسال انتخاب نکرده است.</p>
+          <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 6px;">به محض اینکه فرستنده فایلی اضافه یا حذف کند، این صفحه خودکار و بلادرنگ به‌روز می‌شود.</span>
+        </div>
+      `;
+      return;
+    }
+
+    receiverFileList.innerHTML = files.map(file => {
+      const icon = getCategoryIcon(file.category);
+      const downloadUrl = `${currentSenderHost}/api/download/${encodeURIComponent(file.name)}`;
+      const canPreview = file.preview_url ? true : false;
+      const previewUrl = canPreview ? `${currentSenderHost}/api/preview/${encodeURIComponent(file.name)}` : '';
+
+      return `
+        <div class="file-card">
+          <div class="file-icon">${icon}</div>
+          <div class="file-meta">
+            <div class="file-title" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+            <div class="file-sub">
+              <span>${file.human_size}</span>
+              <span class="file-badge">${file.category}</span>
+            </div>
+          </div>
+          <div class="file-actions" style="display: flex; gap: 6px; align-items: center;">
+            ${canPreview ? `
+              <button class="btn-secondary btn-sm preview-btn" data-url="${previewUrl}" data-type="${file.category}" data-title="${escapeHtml(file.name)}" title="پیش‌نمایش">
+                👁️
+              </button>
+            ` : ''}
+            <a href="${downloadUrl}" download="${escapeHtml(file.name)}" class="btn-primary btn-sm glow-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+              ⬇️ دریافت
+            </a>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Wire preview buttons
+    receiverFileList.querySelectorAll('.preview-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const { url, type, title } = e.currentTarget.dataset;
+        openPreview(url, type, title);
+      });
+    });
+  }
+
+  btnReceiverDownloadAll?.addEventListener('click', () => {
+    if (!currentSenderHost) return;
+    window.location.href = `${currentSenderHost}/api/download-all`;
+  });
+
+  // ----------------------------------------------------
+  // Camera Scanner Implementation
+  // ----------------------------------------------------
+  btnOpenScanner?.addEventListener('click', async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('دوربین در این دستگاه پشتیبانی نمی‌شود. لطفاً آدرس فرستنده را به صورت دستی وارد کنید.');
+      return;
+    }
+
+    if (cameraScanModal) cameraScanModal.style.display = 'flex';
+    if (cameraScanStatus) cameraScanStatus.textContent = 'در حال باز کردن دوربین...';
+
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      if (cameraVideo) {
+        cameraVideo.srcObject = cameraStream;
+        cameraVideo.play();
+      }
+      if (cameraScanStatus) cameraScanStatus.textContent = 'بارکد را روبروی کادر مربع بگیرید...';
+
+      startBarcodeDetection();
+    } catch (err) {
+      if (cameraScanStatus) cameraScanStatus.textContent = 'خطا در دسترسی به دوربین: ' + err.message;
+    }
+  });
+
+  function closeCameraModal() {
+    if (cameraScanInterval) {
+      clearInterval(cameraScanInterval);
+      cameraScanInterval = null;
+    }
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+    if (cameraScanModal) cameraScanModal.style.display = 'none';
+  }
+
+  cameraModalClose?.addEventListener('click', closeCameraModal);
+  btnCancelCamera?.addEventListener('click', closeCameraModal);
+
+  function startBarcodeDetection() {
+    if ('BarcodeDetector' in window) {
+      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      cameraScanInterval = setInterval(async () => {
+        if (!cameraVideo || cameraVideo.readyState < 2) return;
+        try {
+          const barcodes = await detector.detect(cameraVideo);
+          if (barcodes.length > 0) {
+            const rawVal = barcodes[0].rawValue;
+            if (rawVal && (rawVal.includes('http') || rawVal.includes(':8080') || rawVal.includes('192.168'))) {
+              if (window.AndroidBridge && window.AndroidBridge.vibrate) {
+                window.AndroidBridge.vibrate(100);
+              }
+              closeCameraModal();
+              connectToSender(rawVal);
+            }
+          }
+        } catch (e) {}
+      }, 300);
+    } else {
+      if (cameraScanStatus) {
+        cameraScanStatus.textContent = 'مرورگر از اسکن خودکار بارکد پشتیبانی نمی‌کند. لطفاً آدرس را دستی وارد کنید.';
+      }
+    }
+  }
+
   // Load Initial Network Info
   fetch('/api/network')
     .then(r => r.json())

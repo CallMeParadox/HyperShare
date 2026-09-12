@@ -25,8 +25,24 @@
       </div>
     </header>
 
-    <!-- Real-time Speedometer & Active Transfer Bar -->
-    <section class="speed-card" id="speedCard">
+    <!-- Role Switcher Segmented Bar -->
+    <div class="role-bar-container">
+      <div class="role-segmented-control">
+        <button id="btnRoleSender" class="role-seg-btn active">
+          <span class="role-seg-icon">📤</span>
+          <span class="role-seg-title">من فرستنده‌ام (ارسال فایل)</span>
+        </button>
+        <button id="btnRoleReceiver" class="role-seg-btn">
+          <span class="role-seg-icon">📥</span>
+          <span class="role-seg-title">من گیرنده‌ام (دریافت فایل)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- SENDER CONTAINER -->
+    <div id="senderContainer">
+      <!-- Real-time Speedometer & Active Transfer Bar -->
+      <section class="speed-card" id="speedCard">
       <div class="speed-metric">
         <div class="speed-value" id="currentSpeed">0.0</div>
         <div class="speed-unit">MB/s</div>
@@ -248,6 +264,117 @@
         </div>
       </section>
     </main>
+    </div> <!-- /#senderContainer -->
+
+    <!-- RECEIVER CONTAINER -->
+    <div id="receiverContainer" style="display: none;">
+      <!-- Receiver Connection Card -->
+      <section class="receiver-hero-card">
+        <div class="receiver-hero-header">
+          <div class="hero-status-row">
+            <div class="pulse-dot" id="receiverPulseDot"></div>
+            <h2 id="receiverStatusTitle">در انتظار اتصال به دستگاه فرستنده</h2>
+          </div>
+          <p id="receiverStatusSubtitle">برای دریافت فایل‌ها، به دستگاه فرستنده متصل شوید:</p>
+        </div>
+
+        <!-- Connection Inputs & Auto-discover -->
+        <div id="receiverConnActions" class="receiver-conn-actions">
+          <div class="conn-input-group">
+            <input type="text" id="inputSenderHost" class="conn-input" placeholder="آدرس وای‌فای فرستنده (مثلاً 192.168.43.1:8080)">
+            <button id="btnConnectSender" class="btn-primary glow-btn">
+              🔗 اتصال
+            </button>
+          </div>
+          <div class="conn-quick-btns">
+            <button id="btnAutoScanSender" class="btn-secondary" style="flex: 1;">
+              🔍 جستجوی خودکار فرستنده
+            </button>
+            <button id="btnOpenScanner" class="btn-secondary camera-trigger-btn" style="flex: 1;">
+              📷 اسکن بارکد (دوربین)
+            </button>
+          </div>
+        </div>
+
+        <!-- Connected Info Bar -->
+        <div id="receiverConnectedBar" class="receiver-connected-bar" style="display: none;">
+          <div class="connected-badge-row">
+            <span class="badge-tag">🟢 متصل شد</span>
+            <span id="connectedSenderHost" class="connected-host-name">http://192.168.43.1:8080</span>
+            <span class="sync-live-tag">⚡ همگام‌سازی بلادرنگ</span>
+          </div>
+          <div class="connected-action-row">
+            <button id="btnReceiverDownloadAll" class="btn-primary glow-btn">
+              📥 دریافت همه فایل‌ها (ZIP)
+            </button>
+            <button id="btnDisconnectSender" class="btn-secondary danger-btn">
+              قطع اتصال / تغییر
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Live Files List of the Sender -->
+      <section class="receiver-files-card">
+        <div class="receiver-files-header">
+          <div class="title-with-count">
+            <h3>📂 فایل‌های انتخاب‌شده در فرستنده</h3>
+            <span id="receiverFilesCount" class="count-chip">۰ فایل</span>
+          </div>
+          <span class="auto-sync-hint">🔄 تغییرات فرستنده خودکار و بلادرنگ نمایش داده می‌شود</span>
+        </div>
+
+        <div id="receiverFileList" class="file-list">
+          <div class="empty-state">
+            <p>هنوز به دستگاه فرستنده متصل نشده‌اید یا فرستنده هنوز فایلی انتخاب نکرده است.</p>
+          </div>
+        </div>
+      </section>
+    </div> <!-- /#receiverContainer -->
+
+    <!-- Initial Role Selection Modal -->
+    <div class="modal" id="roleModal" style="display: none;">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content role-modal-card">
+        <div class="role-modal-header">
+          <div class="role-glow-icon">⚡</div>
+          <h2>هایپرشیر | انتخاب نقش</h2>
+          <p>می‌خواهید فایل بفرستید یا فایل دریافت کنید؟</p>
+        </div>
+        <div class="role-choice-grid">
+          <button class="role-choice-card sender-card" id="choiceSender">
+            <div class="choice-icon">📤</div>
+            <h3>من فرستنده‌ام</h3>
+            <p>می‌خواهم فایل‌ها را از این دستگاه برای گوشی یا کامپیوتر دیگر بفرستم</p>
+            <span class="choice-tag">شروع ارسال ➔</span>
+          </button>
+          <button class="role-choice-card receiver-card" id="choiceReceiver">
+            <div class="choice-icon">📥</div>
+            <h3>من گیرنده‌ام</h3>
+            <p>می‌خواهم فایل‌های انتخاب‌شده در دستگاه دیگر را ببینم و دریافت کنم</p>
+            <span class="choice-tag">شروع دریافت ➔</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Camera QR Scanner Modal -->
+    <div class="modal" id="cameraScanModal" style="display: none;">
+      <div class="modal-backdrop" id="cameraModalBackdrop"></div>
+      <div class="modal-content camera-modal-card">
+        <button class="modal-close" id="cameraModalClose">&times;</button>
+        <h3>📷 اسکن بارکد فرستنده</h3>
+        <p class="subtitle">دوربین گوشی را روبروی بارکد نمایش داده شده در فرستنده بگیرید:</p>
+        <div class="camera-viewport-wrapper">
+          <video id="cameraVideo" playsinline autoplay></video>
+          <div class="camera-scan-frame">
+            <div class="scan-laser"></div>
+          </div>
+        </div>
+        <div id="cameraScanStatus" class="camera-status-text">در حال راه‌اندازی دوربین...</div>
+        <button id="btnCancelCamera" class="btn-secondary mt-2" style="width: 100%;">بستن اسکنر</button>
+      </div>
+    </div>
 
     <!-- Media Preview Modal -->
     <div class="modal" id="mediaModal">

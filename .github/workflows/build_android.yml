@@ -71,16 +71,16 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
-        tag_name: v1.0.6
-        name: "HyperShare v1.0.6 (100% Standalone Native Windows Desktop App)"
+        tag_name: v1.0.7
+        name: "HyperShare v1.0.7 (Sender & Receiver Roles, Camera Scanner, Real-Time Live Sync)"
         body: |
-          ### ⚡ HyperShare v1.0.6 - Major Release
-          - **100% Standalone Native Desktop Window**: Replaced web browser dependency with a true Windows desktop application window (powered by WebView2). No console window, no browser tabs!
-          - **Windows File Explorer Folder Integration**: Open shared and received files folders directly with 1-click inside Windows Explorer.
-          - **Native Windows File Chooser**: Add any file directly from PC using the standard Windows open-file dialog.
-          - **Dynamic Port Collision Resolver**: Automatically binds to free ports (8080-8099) without conflicts.
-          - **Zero-Copy Streaming**: Sub-50ms instant file selection without disk duplicating.
-          - **Full Bidirectional Transfers**: Stream files back and forth between Android phone and Windows PC over 5GHz Wi-Fi.
+          ### ⚡ HyperShare v1.0.7 - Huge Feature Release
+          - **Sender & Receiver Role Selector**: Choose whether this device is **Sender (ارسال)** or **Receiver (دریافت)** upon opening or toggle anytime from the top bar!
+          - **Real-Time Live Sync (همگام‌سازی بلادرنگ)**: In Receiver mode, any file added or deleted on the Sender instantly reflects on the Receiver screen within 1.5 seconds without page reload!
+          - **Auto-Discovery & Connect**: Automatically probes and detects the phone/sender on the local Wi-Fi hotspot (`/api/find-sender`).
+          - **Camera QR Scanner**: Mobile receivers can point their camera at the sender's QR code to connect and load files in 2 seconds.
+          - **Fixed Null Length Bug**: Fixed edge-case when files list was empty.
+          - **100% Standalone Native Desktop Window**: Powered by WebView2 without console or browser dependency.
           
           ### 📦 Download Assets:
           - **HyperShare_PC.exe**: Windows Desktop App (Double-click to run native window)

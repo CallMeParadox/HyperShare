@@ -745,3 +745,341 @@ body {
   align-items: center;
   gap: 6px;
 }
+
+/* =================================================== */
+/* Role Switcher & Receiver Mode Styles                */
+/* =================================================== */
+
+@media (min-width: 768px) {
+  .app-container {
+    max-width: 860px;
+  }
+}
+
+.role-bar-container {
+  margin: 12px 0 16px 0;
+}
+
+.role-segmented-control {
+  display: flex;
+  background: rgba(18, 24, 36, 0.9);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  gap: 6px;
+}
+
+.role-seg-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.role-seg-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.role-seg-btn.active {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(121, 40, 202, 0.2));
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0, 240, 255, 0.15);
+}
+
+.role-seg-icon {
+  font-size: 16px;
+}
+
+/* Initial Role Modal */
+.role-modal-card {
+  max-width: 520px;
+  text-align: center;
+  padding: 28px 24px;
+}
+
+.role-glow-icon {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 12px;
+  background: linear-gradient(135deg, #00f0ff, #7928ca);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+}
+
+.role-modal-header h2 {
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+
+.role-modal-header p {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.role-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .role-choice-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.role-choice-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 20px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.role-choice-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 8px 25px rgba(0, 240, 255, 0.2);
+}
+
+.choice-icon {
+  font-size: 38px;
+  margin-bottom: 10px;
+}
+
+.role-choice-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.role-choice-card p {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.choice-tag {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  background: rgba(0, 240, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+/* Receiver Hero & Cards */
+.receiver-hero-card, .receiver-files-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.hero-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.hero-status-row h2 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.receiver-hero-header p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.conn-input-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.conn-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  direction: ltr;
+  text-align: left;
+}
+
+.conn-input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.conn-quick-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.receiver-connected-bar {
+  background: rgba(0, 255, 136, 0.08);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.connected-badge-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.badge-tag {
+  background: rgba(0, 255, 136, 0.2);
+  color: var(--accent-green);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.connected-host-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.sync-live-tag {
+  font-size: 11px;
+  color: var(--accent-cyan);
+  background: rgba(0, 240, 255, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.connected-action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.receiver-files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.title-with-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.count-chip {
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--accent-cyan);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.auto-sync-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Camera Scanner */
+.camera-modal-card {
+  max-width: 440px;
+  text-align: center;
+  padding: 20px;
+}
+
+.camera-viewport-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 14px 0;
+}
+
+#cameraVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-scan-frame {
+  position: absolute;
+  top: 15%;
+  left: 15%;
+  right: 15%;
+  bottom: 15%;
+  border: 2px solid var(--accent-cyan);
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.scan-laser {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00f0ff, transparent);
+  box-shadow: 0 0 10px #00f0ff;
+  animation: laserSweep 2s infinite ease-in-out;
+}
+
+@keyframes laserSweep {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+
+.camera-status-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+

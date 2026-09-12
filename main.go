@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"hypershare/engine"
 
@@ -144,6 +145,37 @@ func main() {
 			exec.Command("explorer.exe", target).Start()
 		}
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	})
+
+	// Auto-discovery of sender on local network / hotspot gateway
+	mux.HandleFunc("/api/find-sender", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+
+		candidates := []string{
+			"192.168.43.1:8080",  // Android default Wi-Fi Hotspot
+			"192.168.137.1:8080", // Windows default Wi-Fi Hotspot
+			"192.168.1.1:8080",
+			"192.168.0.1:8080",
+			"172.20.10.1:8080",  // iOS default Hotspot
+		}
+
+		client := http.Client{Timeout: 600 * time.Millisecond}
+		for _, host := range candidates {
+			testURL := fmt.Sprintf("http://%s/api/network", host)
+			resp, err := client.Get(testURL)
+			if err == nil && resp.StatusCode == 200 {
+				resp.Body.Close()
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"found":      true,
+					"sender_url": fmt.Sprintf("http://%s", host),
+					"host":       host,
+				})
+				return
+			}
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{"found": false})
 	})
 
 	mux.HandleFunc("/api/download/", func(w http.ResponseWriter, r *http.Request) {
