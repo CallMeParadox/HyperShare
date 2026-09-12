@@ -22,6 +22,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import android.app.DownloadManager
+import android.os.Environment
+import android.webkit.PermissionRequest
+import android.webkit.URLUtil
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
@@ -99,22 +103,34 @@ class MainActivity : AppCompatActivity() {
         loadingSpinner = findViewById(R.id.loadingSpinner)
         hotspotManager = LocalOnlyHotspotManager(this)
 
-        // 1. Start the embedded server
-        embeddedServer = EmbeddedServer(applicationContext, 8080)
+        // 1. Start the embedded server (Shared Singleton)
+        embeddedServer = EmbeddedServer.getInstance(applicationContext, 8080)
         embeddedServer.start()
 
         // 2. Setup WebView and permissions
         setupWebView()
         checkAndRequestPermissions()
 
-        // 3. Load UI from local server
+        // 3. Handle incoming shared files from other apps
+        handleSendIntent(intent)
+
+        // 4. Load UI from local server
         mainHandler.postDelayed({
             webView.loadUrl("http://127.0.0.1:8080")
         }, 200)
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleSendIntent(intent)
+    }
+
     private fun checkAndRequestPermissions() {
         val permissionsToRequest = mutableListOf<String>()
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.CAMERA)
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
@@ -161,6 +177,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            // Camera and microphone permission for Web QR scanner
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                request?.grant(request.resources)
+            }
+
             // CRITICAL FIX: Enables HTML <input type="file"> to open Android file selector!
             override fun onShowFileChooser(
                 mWebView: WebView?,
@@ -178,12 +199,53 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // CRITICAL FIX: Enables file and zip downloads directly to phone's Downloads folder
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+            try {
+                val request = DownloadManager.Request(Uri.parse(url))
+                val filename = URLUtil.guessFileName(url, contentDisposition, mimetype)
+                request.setMimeType(mimetype)
+                request.addRequestHeader("User-Agent", userAgent)
+                request.setDescription("HyperShare Transfer")
+                request.setTitle(filename)
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+
+                val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
+                dm.enqueue(request)
+                Toast.makeText(this, "شروع دانلود: $filename در پوشه Downloads", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "خطا در دانلود فایل: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         webView.webViewClient = object : WebViewClient() {
             override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
                 mainHandler.postDelayed({
                     view?.loadUrl("http://127.0.0.1:8080")
                 }, 500)
             }
+        }
+    }
+
+    private fun handleSendIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val type = intent.type
+        val uris = mutableListOf<Uri>()
+
+        if (Intent.ACTION_SEND == action && type != null) {
+            (intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))?.let {
+                uris.add(it)
+            }
+        } else if (Intent.ACTION_SEND_MULTIPLE == action && type != null) {
+            intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let { list ->
+                uris.addAll(list)
+            }
+        }
+
+        if (uris.isNotEmpty()) {
+            registerUrisForSharing(uris)
         }
     }
 
@@ -310,7 +372,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        embeddedServer.stop()
-        hotspotManager.stopHotspot()
+        if (isFinishing) {
+            hotspotManager.stopHotspot()
+        }
     }
 }

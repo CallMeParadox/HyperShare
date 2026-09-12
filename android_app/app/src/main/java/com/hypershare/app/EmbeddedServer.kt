@@ -154,6 +154,20 @@ class EmbeddedServer(
 
             val output = socket.getOutputStream()
 
+            // Handle HTTP OPTIONS Preflight
+            if (method == "OPTIONS") {
+                val headerStr = "HTTP/1.1 200 OK\r\n" +
+                        "Access-Control-Allow-Origin: *\r\n" +
+                        "Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD\r\n" +
+                        "Access-Control-Allow-Headers: *\r\n" +
+                        "Access-Control-Max-Age: 86400\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n\r\n"
+                output.write(headerStr.toByteArray())
+                output.flush()
+                return
+            }
+
             // Captive portal probes
             if (path == "/generate_204" || path == "/gen_204") {
                 output.write("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n".toByteArray())
@@ -175,9 +189,18 @@ class EmbeddedServer(
                     sendResponse(output, 200, "OK", "application/json", json.toByteArray())
                 }
 
+                path == "/api/find-sender" -> {
+                    val candidate = discoverSenderCandidate()
+                    sendResponse(output, 200, "OK", "application/json", candidate.toByteArray())
+                }
+
                 path == "/api/files" -> {
                     val filesJson = listSharedFilesJson()
                     sendResponse(output, 200, "OK", "application/json", filesJson.toByteArray())
+                }
+
+                path == "/api/download-all" -> {
+                    serveDownloadAll(output)
                 }
 
                 path.startsWith("/api/download/") -> {
@@ -214,8 +237,10 @@ class EmbeddedServer(
                     handleUploadRequest(fullPath, headers, input, output)
                 }
 
-                path == "/api/speedtest" -> {
-                    serveSpeedTest(output)
+                path.startsWith("/api/speedtest") -> {
+                    val sizeParam = fullPath.substringAfter("size_mb=", "").substringBefore("&").toIntOrNull() ?: 50
+                    val sizeMB = sizeParam.coerceIn(1, 1000)
+                    serveSpeedTest(sizeMB, output)
                 }
 
                 path == "/api/clipboard" -> {
@@ -307,13 +332,14 @@ class EmbeddedServer(
 
         val contentLength = headers["content-length"]?.toLongOrNull() ?: -1L
         val contentType = headers["content-type"] ?: ""
-        val receivedDir = getReceivedDirectory()
+        val isTargetShared = queryParams.contains("target=shared")
+        val targetDir = if (isTargetShared) getSharedDirectory() else getReceivedDirectory()
         val uploadedNames = mutableListOf<String>()
 
         try {
             if (!queryFilename.isNullOrEmpty()) {
                 val safeName = File(queryFilename).name
-                val destFile = File(receivedDir, safeName)
+                val destFile = File(targetDir, safeName)
                 FileOutputStream(destFile).use { fos ->
                     val buffer = ByteArray(64 * 1024)
                     var remaining = contentLength
@@ -334,7 +360,7 @@ class EmbeddedServer(
                 }
                 uploadedNames.add(safeName)
             } else if (contentType.contains("multipart/form-data")) {
-                parseMultipartUpload(input, contentType, contentLength, receivedDir, uploadedNames)
+                parseMultipartUpload(input, contentType, contentLength, targetDir, uploadedNames)
             }
 
             val resJson = """{"status":"success","count":${uploadedNames.size},"uploaded":${uploadedNames.joinToString(",", "[", "]") { quote(it) }}}"""
@@ -531,7 +557,7 @@ class EmbeddedServer(
             val encName = java.net.URLEncoder.encode(item.name, "UTF-8").replace("+", "%20")
             val dlUrl = "/api/download/$encName"
             val prevUrl = if (item.category in listOf("video", "image", "audio")) "/api/preview/$encName" else ""
-            result.add("""{"id":${quote(item.id)},"name":${quote(item.name)},"size":${item.size},"human_size":"${item.humanSize}","category":"${item.category}","downloadURL":"$dlUrl","preview_url":${quote(prevUrl)}}""")
+            result.add("""{"id":${quote(item.id)},"name":${quote(item.name)},"size":${item.size},"human_size":"${item.humanSize}","category":"${item.category}","download_url":"$dlUrl","downloadURL":"$dlUrl","preview_url":${quote(prevUrl)}}""")
         }
 
         val dir = getSharedDirectory()
@@ -545,7 +571,7 @@ class EmbeddedServer(
                 val encName = java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20")
                 val dlUrl = "/api/download/$encName"
                 val prevUrl = if (cat in listOf("video", "image", "audio")) "/api/preview/$encName" else ""
-                result.add("""{"id":${quote(name)},"name":${quote(name)},"size":$size,"human_size":"$humanSize","category":"$cat","downloadURL":"$dlUrl","preview_url":${quote(prevUrl)}}""")
+                result.add("""{"id":${quote(name)},"name":${quote(name)},"size":$size,"human_size":"$humanSize","category":"$cat","download_url":"$dlUrl","downloadURL":"$dlUrl","preview_url":${quote(prevUrl)}}""")
             }
         }
 
@@ -589,6 +615,8 @@ class EmbeddedServer(
                 "Content-Type: $contentType\r\n" +
                 "Content-Length: ${body.size}\r\n" +
                 "Access-Control-Allow-Origin: *\r\n" +
+                "Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD\r\n" +
+                "Access-Control-Allow-Headers: *\r\n" +
                 "Connection: close\r\n\r\n"
         output.write(header.toByteArray())
         output.write(body)
@@ -628,11 +656,104 @@ class EmbeddedServer(
         return "127.0.0.1"
     }
 
-    private fun serveSpeedTest(output: OutputStream) {
-        val totalBytes = 50 * 1024 * 1024L // 50MB benchmark
+    private fun discoverSenderCandidate(): String {
+        val candidates = listOf(
+            "192.168.43.1:8080",
+            "192.168.137.1:8080",
+            "192.168.1.1:8080",
+            "192.168.0.1:8080",
+            "172.20.10.1:8080"
+        )
+        for (host in candidates) {
+            try {
+                val url = java.net.URL("http://$host/api/network")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 400
+                conn.readTimeout = 400
+                conn.requestMethod = "GET"
+                if (conn.responseCode == 200) {
+                    conn.disconnect()
+                    return """{"found":true,"sender_url":"http://$host","host":"$host"}"""
+                }
+                conn.disconnect()
+            } catch (e: Exception) {}
+        }
+        return """{"found":false}"""
+    }
+
+    private fun serveDownloadAll(output: OutputStream) {
+        val headerStr = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: application/zip\r\n" +
+                "Content-Disposition: attachment; filename=\"HyperShare_All_Files.zip\"\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Connection: close\r\n\r\n"
+        output.write(headerStr.toByteArray())
+
+        val zipOut = java.util.zip.ZipOutputStream(output)
+        val buffer = ByteArray(64 * 1024)
+
+        // Stream in-memory items
+        for (item in memorySharedItems) {
+            try {
+                val entry = java.util.zip.ZipEntry(item.name)
+                entry.time = System.currentTimeMillis()
+                zipOut.putNextEntry(entry)
+                if (item.uri != null) {
+                    context.contentResolver.openInputStream(item.uri)?.use { stream ->
+                        var r: Int
+                        while (stream.read(buffer).also { r = it } != -1) {
+                            zipOut.write(buffer, 0, r)
+                        }
+                    }
+                } else if (item.file != null && item.file.exists()) {
+                    FileInputStream(item.file).use { stream ->
+                        var r: Int
+                        while (stream.read(buffer).also { r = it } != -1) {
+                            zipOut.write(buffer, 0, r)
+                        }
+                    }
+                }
+                zipOut.closeEntry()
+            } catch (e: Exception) {
+                Log.e(TAG, "Zip entry error: ${e.message}")
+            }
+        }
+
+        // Stream physical files
+        val dir = getSharedDirectory()
+        val files = dir.listFiles() ?: emptyArray()
+        for (f in files) {
+            if (f.isFile && memorySharedItems.none { it.name == f.name }) {
+                try {
+                    val entry = java.util.zip.ZipEntry(f.name)
+                    entry.time = f.lastModified()
+                    zipOut.putNextEntry(entry)
+                    FileInputStream(f).use { stream ->
+                        var r: Int
+                        while (stream.read(buffer).also { r = it } != -1) {
+                            zipOut.write(buffer, 0, r)
+                        }
+                    }
+                    zipOut.closeEntry()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Zip file error: ${e.message}")
+                }
+            }
+        }
+
+        try {
+            zipOut.finish()
+            zipOut.flush()
+        } catch (e: Exception) {}
+    }
+
+    private fun serveSpeedTest(sizeMB: Int, output: OutputStream) {
+        val totalBytes = sizeMB.toLong() * 1024 * 1024L
         val headerStr = "HTTP/1.1 200 OK\r\n" +
                 "Content-Type: application/octet-stream\r\n" +
                 "Content-Length: $totalBytes\r\n" +
+                "Content-Disposition: attachment; filename=\"benchmark_${sizeMB}mb.bin\"\r\n" +
+                "Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n" +
                 "Access-Control-Allow-Origin: *\r\n" +
                 "Connection: close\r\n\r\n"
 
@@ -641,8 +762,9 @@ class EmbeddedServer(
         val zeroChunk = ByteArray(64 * 1024)
         var written = 0L
         while (written < totalBytes) {
-            output.write(zeroChunk)
-            written += zeroChunk.size
+            val toWrite = if (totalBytes - written < zeroChunk.size) (totalBytes - written).toInt() else zeroChunk.size
+            output.write(zeroChunk, 0, toWrite)
+            written += toWrite
         }
         output.flush()
     }
@@ -693,5 +815,14 @@ class EmbeddedServer(
 
     companion object {
         private const val TAG = "HyperShare::Server"
+
+        @Volatile
+        private var instance: EmbeddedServer? = null
+
+        fun getInstance(context: Context, port: Int = 8080): EmbeddedServer {
+            return instance ?: synchronized(this) {
+                instance ?: EmbeddedServer(context.applicationContext, port).also { instance = it }
+            }
+        }
     }
 }

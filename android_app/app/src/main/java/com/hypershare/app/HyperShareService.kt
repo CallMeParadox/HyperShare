@@ -39,8 +39,8 @@ class HyperShareService : Service() {
         )
         wifiLock?.acquire()
 
-        // Embedded server
-        embeddedServer = EmbeddedServer(applicationContext, 8080)
+        // Embedded server (Shared Singleton)
+        embeddedServer = EmbeddedServer.getInstance(applicationContext, 8080)
         embeddedServer?.start()
 
         startForeground(NOTIFICATION_ID, buildNotification("هایپرشیر آماده به کار", "آماده انتقال فایل (هیچ دانلودی در جریان نیست)"))

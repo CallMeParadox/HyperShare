@@ -18,10 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const etaTime = document.getElementById('etaTime');
   const networkStatus = document.getElementById('networkStatus');
   const btnAddFiles = document.getElementById('btnAddFiles');
-  const btnPickFilesNative = document.getElementById('btnPickFilesNative');
-  const fileInput = document.getElementById('fileInput');
+  const mainFileInput = document.getElementById('mainFileInput');
   const btnOpenSharedFolder = document.getElementById('btnOpenSharedFolder');
   const btnOpenReceivedFolder = document.getElementById('btnOpenReceivedFolder');
+  const senderBannerUrl = document.getElementById('senderBannerUrl');
+  const btnCopySenderUrl = document.getElementById('btnCopySenderUrl');
+  const btnBannerShowQR = document.getElementById('btnBannerShowQR');
 
   // Show PC specific buttons if not inside Android app
   if (!window.AndroidBridge) {
@@ -37,29 +39,74 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('/api/open-folder?type=received');
   });
 
+  btnBannerShowQR?.addEventListener('click', () => {
+    if (typeof openQRModal === 'function') openQRModal();
+    else {
+      const qm = document.getElementById('qrModal');
+      if (qm) { qm.style.display = 'flex'; qm.classList.add('open'); }
+    }
+  });
+
+  btnCopySenderUrl?.addEventListener('click', () => {
+    const url = senderBannerUrl?.textContent || '';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        alert('✅ آدرس وای‌فای فرستنده کپی شد:\n' + url);
+      });
+    } else {
+      prompt('آدرس فرستنده را کپی کنید:', url);
+    }
+  });
+
+  async function uploadFileDirectly(file, target = 'shared') {
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `/api/upload?target=${target}&name=${encodeURIComponent(file.name)}&size=${file.size}`);
+      xhr.onload = () => resolve();
+      xhr.onerror = () => resolve();
+      xhr.send(file);
+    });
+  }
+
   btnAddFiles?.addEventListener('click', async () => {
     if (window.AndroidBridge && window.AndroidBridge.pickFilesForSharing) {
       window.AndroidBridge.pickFilesForSharing();
     } else if (window.AndroidBridge && window.AndroidBridge.pickFiles) {
       window.AndroidBridge.pickFiles();
     } else {
-      // Windows PC native file picker
+      // Windows PC native file picker or browser fallback
       try {
         btnAddFiles.disabled = true;
         const origText = btnAddFiles.innerHTML;
-        btnAddFiles.innerHTML = '⏳ در حال انتخاب فایل از ویندوز...';
+        btnAddFiles.innerHTML = '⏳ در حال باز کردن انتخاب‌گر فایل...';
         const res = await fetch('/api/pick-pc-files', { method: 'POST' });
         const data = await res.json();
-        if (data.count > 0) {
+        if (data && data.count > 0) {
           loadFiles();
+        } else {
+          mainFileInput?.click();
         }
       } catch (err) {
-        console.error('File pick error:', err);
+        mainFileInput?.click();
       } finally {
         btnAddFiles.disabled = false;
         btnAddFiles.innerHTML = '➕ افزودن فایل برای اشتراک و ارسال';
       }
     }
+  });
+
+  mainFileInput?.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    btnAddFiles.disabled = true;
+    btnAddFiles.innerHTML = '⏳ در حال افزودن فایل‌ها...';
+    for (const file of files) {
+      await uploadFileDirectly(file, 'shared');
+    }
+    mainFileInput.value = '';
+    btnAddFiles.disabled = false;
+    btnAddFiles.innerHTML = '➕ افزودن فایل برای اشتراک و ارسال';
+    loadFiles();
   });
 
   // ----------------------------------------------------
@@ -400,6 +447,9 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         networkStatus.textContent = `Direct LAN (${net.primary_ip})`;
       }
+      if (senderBannerUrl && (net.receiver_url || net.primary_ip)) {
+        senderBannerUrl.textContent = net.receiver_url || `http://${net.primary_ip}:8080`;
+      }
     })
     .catch(() => {});
 
@@ -432,18 +482,6 @@ document.addEventListener('DOMContentLoaded', () => {
       renderFiles();
     });
   });
-
-  // Add Files Action Handler (Opens native file picker or fallback)
-  function triggerFilePick() {
-    if (window.AndroidBridge && window.AndroidBridge.pickFilesForSharing) {
-      window.AndroidBridge.pickFilesForSharing();
-    } else if (fileInput) {
-      fileInput.click();
-    }
-  }
-
-  btnAddFiles?.addEventListener('click', triggerFilePick);
-  btnPickFilesNative?.addEventListener('click', triggerFilePick);
 
   // Fetch & Render Files
   async function loadFiles() {
@@ -482,12 +520,13 @@ document.addEventListener('DOMContentLoaded', () => {
     fileListContainer.innerHTML = filtered.map(file => {
       const icon = getCategoryIcon(file.category);
       const canPreview = file.preview_url ? true : false;
+      const downloadUrl = file.download_url || file.downloadURL || (`/api/download/${encodeURIComponent(file.name)}`);
 
       return `
         <div class="file-card">
           <div class="file-icon">${icon}</div>
           <div class="file-meta">
-            <div class="file-title" title="${file.name}">${file.name}</div>
+            <div class="file-title" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
             <div class="file-sub">
               <span>${file.human_size}</span>
               <span>•</span>
@@ -496,14 +535,14 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="file-actions">
             ${canPreview ? `
-              <button class="action-icon-btn preview-btn" data-url="${file.preview_url}" data-type="${file.category}" data-title="${file.name}">
+              <button class="action-icon-btn preview-btn" data-url="${file.preview_url}" data-type="${file.category}" data-title="${escapeHtml(file.name)}">
                 👁️ پیش‌نمایش
               </button>
             ` : ''}
-            <a href="${file.downloadURL}" class="action-icon-btn dl-btn" download="${file.name}">
+            <a href="${downloadUrl}" class="action-icon-btn dl-btn" download="${escapeHtml(file.name)}">
               ⬇️ دریافت
             </a>
-            <button class="action-icon-btn delete-btn danger-icon-btn" data-id="${file.id || ''}" data-name="${file.name}" title="حذف از لیست">
+            <button class="action-icon-btn delete-btn danger-icon-btn" data-id="${file.id || ''}" data-name="${escapeHtml(file.name)}" title="حذف از لیست">
               🗑️
             </button>
           </div>
@@ -675,13 +714,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }, 400);
 
+    const baseHost = (activeRole === 'receiver' && currentSenderHost) ? currentSenderHost : '';
     const promises = [];
     for (let i = 0; i < numChunks; i++) {
       const start = i * chunkSize;
       const end = Math.min((i + 1) * chunkSize - 1, totalSize - 1);
 
       promises.push((async () => {
-        const res = await fetch(`/api/download/${encodeURIComponent(filename)}`, {
+        const res = await fetch(`${baseHost}/api/download/${encodeURIComponent(filename)}`, {
           headers: { 'Range': `bytes=${start}-${end}` }
         });
 
@@ -998,8 +1038,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         await new Promise((resolve, reject) => {
+          const targetHost = (activeRole === 'receiver' && currentSenderHost) ? currentSenderHost : '';
           const xhr = new XMLHttpRequest();
-          xhr.open('POST', `/api/upload?name=${encodeURIComponent(file.name)}&size=${file.size}`);
+          xhr.open('POST', `${targetHost}/api/upload?name=${encodeURIComponent(file.name)}&size=${file.size}`);
 
           xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) {
@@ -1034,6 +1075,37 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedUploadFiles = [];
     renderUploadQueue();
     loadFiles();
+  });
+
+  // Global Drag & Drop: Drop files anywhere to share or send
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  window.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      if (activeRole === 'receiver') {
+        droppedFiles.forEach(nf => {
+          if (!selectedUploadFiles.some(f => f.name === nf.name && f.size === nf.size)) {
+            selectedUploadFiles.push(nf);
+          }
+        });
+        renderUploadQueue();
+        const tabUpload = document.querySelector('.tab-btn[data-tab="upload"]');
+        if (tabUpload) tabUpload.click();
+      } else {
+        btnAddFiles.disabled = true;
+        btnAddFiles.innerHTML = '⏳ در حال افزودن فایل‌ها...';
+        for (const file of droppedFiles) {
+          await uploadFileDirectly(file, 'shared');
+        }
+        btnAddFiles.disabled = false;
+        btnAddFiles.innerHTML = '➕ افزودن فایل برای اشتراک و ارسال';
+        loadFiles();
+      }
+    }
   });
 
   // ----------------------------------------------------

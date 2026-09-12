@@ -109,8 +109,8 @@ func main() {
 			return
 		}
 
-		psScript := `Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.OpenFileDialog; $f.Multiselect = $true; $f.Title = 'انتخاب فایل‌ها برای اشتراک در هایپرشیر'; if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $f.FileNames | ForEach-Object { Write-Output $_ } }`
-		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", psScript)
+		psScript := `[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $f = New-Object System.Windows.Forms.OpenFileDialog; $f.Multiselect = $true; $f.Title = 'انتخاب فایل‌ها برای اشتراک در هایپرشیر'; if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $f.FileNames | ForEach-Object { [Console]::WriteLine($_) } }`
+		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-STA", "-Command", psScript)
 		out, err := cmd.Output()
 		if err != nil {
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": "error", "count": 0, "message": err.Error()})
@@ -189,7 +189,7 @@ func main() {
 	mux.HandleFunc("/api/download-all", engine.HandleDownloadAll(absDir))
 	mux.HandleFunc("/api/speedtest", engine.HandleSpeedTest)
 	mux.HandleFunc("/api/clipboard", engine.HandleClipboardAPI)
-	mux.HandleFunc("/api/upload", engine.HandleUpload(absUpload))
+	mux.HandleFunc("/api/upload", engine.HandleUpload(absUpload, absDir))
 
 	// Dynamic QR Code Endpoints
 	mux.HandleFunc("/api/qr/url", engine.HandleQRCodePNG(func() string {

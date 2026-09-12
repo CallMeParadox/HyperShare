@@ -355,6 +355,52 @@ body {
 }
 
 /* =================================================== */
+/* Sender Direct Connection Banner                     */
+/* =================================================== */
+
+.sender-conn-banner {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  border-right: 4px solid var(--paradox-coral);
+}
+
+.sender-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sender-banner-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.sender-banner-url-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sender-url-code {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--paradox-teal);
+  background: rgba(0, 194, 203, 0.1);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--paradox-teal);
+  letter-spacing: 0.5px;
+  direction: ltr;
+}
+
+/* =================================================== */
 /* Speedometer & Transfer Bar                          */
 /* =================================================== */
 

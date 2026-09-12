@@ -21,8 +21,9 @@ type FileItem struct {
 	Category    string    `json:"category"` // video, image, audio, app, document, archive, other
 	MimeType    string    `json:"mime_type"`
 	ModTime     time.Time `json:"mod_time"`
-	DownloadURL string    `json:"download_url"`
-	PreviewURL  string    `json:"preview_url,omitempty"`
+	DownloadURL       string    `json:"download_url"`
+	DownloadURLCompat string    `json:"downloadURL"`
+	PreviewURL        string    `json:"preview_url,omitempty"`
 }
 
 // CategorizeFile determines file category for UI filtering.
@@ -91,8 +92,9 @@ func ListFiles(sharedDir string) ([]FileItem, error) {
 			HumanSize:   FormatBytes(info.Size()),
 			Category:    cat,
 			MimeType:    mimeType,
-			ModTime:     info.ModTime(),
-			DownloadURL: fmt.Sprintf("/api/download/%s", name),
+			ModTime:           info.ModTime(),
+			DownloadURL:       fmt.Sprintf("/api/download/%s", name),
+			DownloadURLCompat: fmt.Sprintf("/api/download/%s", name),
 		}
 
 		if cat == "image" || cat == "video" || cat == "audio" {

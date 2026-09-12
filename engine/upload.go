@@ -10,11 +10,11 @@ import (
 )
 
 // HandleUpload handles bidirectional file uploads from web client or receiver app.
-func HandleUpload(uploadDir string) http.HandlerFunc {
+func HandleUpload(uploadDir string, optionalSharedDir ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
@@ -26,8 +26,13 @@ func HandleUpload(uploadDir string) http.HandlerFunc {
 			return
 		}
 
+		targetDir := uploadDir
+		if len(optionalSharedDir) > 0 && r.URL.Query().Get("target") == "shared" {
+			targetDir = optionalSharedDir[0]
+		}
+
 		// Ensure target directory exists
-		if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
 			http.Error(w, fmt.Sprintf("Failed to create upload dir: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -35,7 +40,7 @@ func HandleUpload(uploadDir string) http.HandlerFunc {
 		// Check if direct streaming upload via query param ?name=...
 		if queryName := r.URL.Query().Get("name"); queryName != "" {
 			safeName := filepath.Base(queryName)
-			destPath := filepath.Join(uploadDir, safeName)
+			destPath := filepath.Join(targetDir, safeName)
 			destFile, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Failed to open file: %v", err), http.StatusInternalServerError)
@@ -83,7 +88,7 @@ func HandleUpload(uploadDir string) http.HandlerFunc {
 
 			// Sanitize filename to prevent path traversal
 			filename = filepath.Base(filename)
-			destPath := filepath.Join(uploadDir, filename)
+			destPath := filepath.Join(targetDir, filename)
 
 			destFile, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 			if err != nil {

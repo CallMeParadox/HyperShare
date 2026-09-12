@@ -71,16 +71,18 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
-        tag_name: v1.0.9
-        name: "HyperShare v1.0.9 (Fix QR Modal Startup & Close Button)"
+        tag_name: v1.1.0
+        name: "HyperShare v1.1.0 (Full System Audit & Cross-Device Stability Fixes)"
         body: |
-          ### 🚀 HyperShare v1.0.9
-          - **Fix QR Modal Stuck on Launch**: Fixed an issue where the Easy Connection QR modal was rendered by default and could not be closed via the 'X' button due to a CSS display rule bug.
-          - **Full Paradox Brand Design System**: Re-crafted the entire user interface based on the official Paradox identity (vibrant Coral Red `#FF4D5E`, Tropical Turquoise `#00C2CB`, crisp 3D white stickers, and tactile puffy buttons).
-          - **Sender & Receiver Dual Roles**: Select whether you are Sender or Receiver upon opening, with instant role switching.
-          - **Real-Time Live Sync**: Any file added or deleted by the sender automatically updates on the receiver screen in 1.5 seconds.
-          - **Camera QR Scanner & Auto-Discovery**: Connect via camera scan or automatic Wi-Fi gateway detection.
-          - **100% Native Windows App**: Desktop window powered by WebView2 without console or browser tabs.
+          ### 🚀 HyperShare v1.1.0 - Full System Audit & Core Fixes
+          - **Fixed Server Port Collision (Singleton Server)**: Resolved `java.net.BindException: Address already in use` by refactoring `EmbeddedServer` into a thread-safe singleton shared between `MainActivity` and `HyperShareService`.
+          - **Full Download Support on Android**: Added `DownloadListener` to Android WebView to save files directly into the Android Downloads folder.
+          - **Camera QR Scanner Web Permission**: Granted camera access in `WebChromeClient.onPermissionRequest` and added runtime camera permission checks.
+          - **Android Share Sheet Integration**: Added handling for incoming `ACTION_SEND` and `ACTION_SEND_MULTIPLE` intents.
+          - **Fixed PC Download Links & Dialogs**: Fixed `file.downloadURL` vs `file.download_url` discrepancy, added `-STA` and hidden console to PowerShell file dialogs.
+          - **Streaming ZIP Download on Android**: Added `/api/download-all` on-the-fly zip streaming to mobile embedded server.
+          - **Prominent Wi-Fi Address Banner**: Sender screen now clearly presents the device's Wi-Fi connection URL with 1-click Copy and QR code buttons.
+          - **Global Window Drag & Drop**: Drag files anywhere into the app window to share or queue them.
           
           ### 📦 Download Assets:
           - **HyperShare_PC.exe**: Windows Desktop App (Double-click to run native window)

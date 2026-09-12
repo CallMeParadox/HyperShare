@@ -48,6 +48,18 @@
 
     <!-- SENDER CONTAINER -->
     <div id="senderContainer">
+      <!-- Sender Direct Wi-Fi Connection Banner -->
+      <div class="sender-conn-banner" id="senderConnBanner">
+        <div class="sender-banner-info">
+          <span class="sender-banner-label">🌐 آدرس وای‌فای این فرستنده جهت اتصال گیرنده:</span>
+          <div class="sender-banner-url-row">
+            <code id="senderBannerUrl" class="sender-url-code">در حال دریافت آدرس شبکه...</code>
+            <button id="btnCopySenderUrl" class="btn-secondary btn-sm" type="button" title="کپی کردن آدرس">📋 کپی</button>
+            <button id="btnBannerShowQR" class="btn-primary btn-sm glow-btn" type="button" title="نمایش بارکد QR">📱 بارکد اتصال</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Real-time Speedometer & Active Transfer Bar -->
       <section class="speed-card" id="speedCard">
       <div class="speed-metric">
@@ -98,6 +110,7 @@
       <!-- TAB 1: Files List -->
       <section id="tab-files" class="tab-content active">
         <div class="top-action-banner" style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <input type="file" id="mainFileInput" multiple style="display: none;">
           <button id="btnAddFiles" class="btn-primary glow-btn add-files-btn" style="flex: 2; min-width: 200px;">
             ➕ افزودن فایل برای اشتراک و ارسال
           </button>
