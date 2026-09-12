@@ -628,7 +628,51 @@ class EmbeddedServer(
         return "127.0.0.1"
     }
 
-    private fun formatBytes(bytes: Long): String {
+    private fun serveSpeedTest(output: OutputStream) {
+        val totalBytes = 50 * 1024 * 1024L // 50MB benchmark
+        val headerStr = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: application/octet-stream\r\n" +
+                "Content-Length: $totalBytes\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Connection: close\r\n\r\n"
+
+        output.write(headerStr.toByteArray())
+
+        val zeroChunk = ByteArray(64 * 1024)
+        var written = 0L
+        while (written < totalBytes) {
+            output.write(zeroChunk)
+            written += zeroChunk.size
+        }
+        output.flush()
+    }
+
+    private fun serveQrPng(content: String, output: OutputStream) {
+        try {
+            val writer = QRCodeWriter()
+            val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, 256, 256)
+            val width = bitMatrix.width
+            val height = bitMatrix.height
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+
+            for (x in 0 until width) {
+                for (y in 0 until height) {
+                    bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) -0x1000000 else -0x1)
+                }
+            }
+
+            val baos = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+            val pngBytes = baos.toByteArray()
+
+            sendResponse(output, 200, "OK", "image/png", pngBytes)
+        } catch (e: Exception) {
+            val err = "QR generation error"
+            sendResponse(output, 500, "Error", "text/plain", err.toByteArray())
+        }
+    }
+
+    fun formatBytes(bytes: Long): String {
         val kb = bytes / 1024.0
         val mb = kb / 1024.0
         val gb = mb / 1024.0
