@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>HyperShare | هایپرشیر - انتقال فوق سریع</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation / Brand Bar -->
+    <header class="header">
+      <div class="logo-area">
+        <div class="glow-icon">⚡</div>
+        <div class="brand-titles">
+          <h1>Hyper<span>Share</span></h1>
+          <p class="subtitle">انتقال فوق‌سریع آفلاین ۵ گیگاهرتز</p>
+        </div>
+      </div>
+      <div class="status-badge">
+        <span class="pulse-dot"></span>
+        <span id="networkStatus">5GHz P2P Direct</span>
+      </div>
+    </header>
+
+    <!-- Real-time Speedometer & Active Transfer Bar -->
+    <section class="speed-card" id="speedCard">
+      <div class="speed-metric">
+        <div class="speed-value" id="currentSpeed">0.0</div>
+        <div class="speed-unit">MB/s</div>
+      </div>
+      <div class="speed-details">
+        <div class="transfer-info">
+          <span id="transferFileName">آماده دریافت یا ارسال</span>
+          <span id="transferPercent">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="transfer-stats">
+          <span id="transferredBytes">0 MB / 0 MB</span>
+          <span id="etaTime">ETA: --</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="files">
+        <span class="tab-icon">📁</span>
+        <span>فایل‌ها</span>
+      </button>
+      <button class="tab-btn" data-tab="turbo">
+        <span class="tab-icon">🚀</span>
+        <span>شتاب‌دهنده موازی</span>
+      </button>
+      <button class="tab-btn" data-tab="speedtest">
+        <span class="tab-icon">⚡</span>
+        <span>تست سرعت</span>
+      </button>
+      <button class="tab-btn" data-tab="clipboard">
+        <span class="tab-icon">📋</span>
+        <span>متن و لینک</span>
+      </button>
+      <button class="tab-btn" data-tab="upload">
+        <span class="tab-icon">📤</span>
+        <span>ارسال فایل</span>
+      </button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+      <!-- TAB 1: Files List -->
+      <section id="tab-files" class="tab-content active">
+        <div class="filter-bar">
+          <div class="category-chips">
+            <button class="chip active" data-cat="all">همه</button>
+            <button class="chip" data-cat="video">ویدیوها</button>
+            <button class="chip" data-cat="image">عکس‌ها</button>
+            <button class="chip" data-cat="audio">موزیک</button>
+            <button class="chip" data-cat="app">برنامه‌ها (APK)</button>
+            <button class="chip" data-cat="document">اسناد</button>
+          </div>
+          <button id="btnDownloadAll" class="btn-primary glow-btn">
+            ⚡ دریافت همه (ZIP)
+          </button>
+        </div>
+
+        <div class="file-list" id="fileListContainer">
+          <div class="loading-state">در حال بارگذاری لیست فایل‌ها...</div>
+        </div>
+      </section>
+
+      <!-- TAB 2: Turbo Multi-Stream Downloader -->
+      <section id="tab-turbo" class="tab-content">
+        <div class="turbo-card">
+          <div class="turbo-header">
+            <h3>موتور شتاب‌دهنده چندکاناله (Multi-Stream Range Downloader)</h3>
+            <p>این ماژول فایل‌های حجیم را به ۸ تکه هم‌زمان تقسیم کرده و با اشباع پهنای باند ۵ گیگاهرتز، به حداکثر سرعت تئوریک (تا ۱۵۰ مگابایت بر ثانیه) می‌رساند.</p>
+          </div>
+
+          <div class="turbo-selector">
+            <label for="turboFileSelect">یک فایل حجیم را انتخاب کنید:</label>
+            <select id="turboFileSelect" class="form-select">
+              <option value="">در حال اسکن فایل‌ها...</option>
+            </select>
+          </div>
+
+          <div class="turbo-actions">
+            <button id="btnStartTurbo" class="btn-primary turbo-btn" disabled>
+              🚀 شلیک توربو (دانلود با ۸ استریم موازی)
+            </button>
+          </div>
+
+          <!-- Multi-chunk Visualizer -->
+          <div class="chunk-visualizer" id="chunkContainer" style="display: none;">
+            <h4>وضعیت کانال‌های موازی (8 Parallel Sockets):</h4>
+            <div class="chunk-grid" id="chunkGrid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: 5GHz Speed Test Benchmark -->
+      <section id="tab-speedtest" class="tab-content">
+        <div class="benchmark-card">
+          <div class="benchmark-header">
+            <div class="dial-container">
+              <svg class="speed-dial-svg" viewBox="0 0 200 120">
+                <path class="dial-bg" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="16" />
+                <path class="dial-val" id="dialMeter" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="16" stroke-dasharray="251" stroke-dashoffset="251" />
+              </svg>
+              <div class="dial-text">
+                <span class="dial-num" id="benchPeakSpeed">0</span>
+                <span class="dial-sub">MB/s پیک سرعت</span>
+              </div>
+            </div>
+            <h3>تست سرعت امواج ۵ گیگاهرتز هات‌اسپات</h3>
+            <p>این تست، داده‌های مصنوعی را بدون درگیر کردن دیسک مستقیماً درون رم (RAM) استریم می‌کند تا سقف سرعت واقعی رادیویی دو گوشی مشخص شود.</p>
+          </div>
+
+          <div class="bench-controls">
+            <div class="size-radios">
+              <label><input type="radio" name="benchSize" value="50"> ۵۰ مگابایت</label>
+              <label><input type="radio" name="benchSize" value="100" checked> ۱۰۰ مگابایت</label>
+              <label><input type="radio" name="benchSize" value="300"> ۳۰۰ مگابایت</label>
+            </div>
+            <button id="btnRunSpeedTest" class="btn-primary glow-btn">
+              ⚡ شروع بنچمارک سرعت واقعی
+            </button>
+          </div>
+
+          <div class="bench-results" id="benchResults" style="display: none;">
+            <div class="res-item">
+              <span class="res-label">میانگین سرعت:</span>
+              <span class="res-val" id="benchAvgSpeed">0.0 MB/s</span>
+            </div>
+            <div class="res-item">
+              <span class="res-label">زمان انتقال:</span>
+              <span class="res-val" id="benchDuration">0.0 ثانیه</span>
+            </div>
+            <div class="res-item">
+              <span class="res-label">کیفیت لینک:</span>
+              <span class="res-val status-green" id="benchQuality">فوق‌العاده (Ultra 5GHz)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: Text / Clipboard Beam -->
+      <section id="tab-clipboard" class="tab-content">
+        <div class="card">
+          <h3>اشتراک‌گذاری فوری متن و لینک</h3>
+          <p class="card-desc">متن یا لینکی را بنویسید تا درجا روی گوشی دیگر ظاهر شود.</p>
+          <div class="clipboard-input-box">
+            <textarea id="clipInput" rows="3" placeholder="متن، لینک، یا شماره تلفن مورد نظر را اینجا تایپ یا الصاق کنید..."></textarea>
+            <button id="btnSendClip" class="btn-primary">ارسال به گوشی مقابل</button>
+          </div>
+
+          <h4 class="mt-4">متن‌های اشتراک‌گذاشته‌شده اخیر:</h4>
+          <div class="clip-list" id="clipList">
+            <div class="empty-state">هنوز متنی اشتراک گذاشته نشده است.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: Upload Files Back to Sender -->
+      <section id="tab-upload" class="tab-content">
+        <div class="card">
+          <h3>ارسال فایل به گوشی فرستنده</h3>
+          <p class="card-desc">گیرنده می‌تواند از همینجا فایل‌های خود را برای فرستنده بفرستد (بدون نیاز به نرم‌افزار اضافی).</p>
+
+          <div class="dropzone" id="dropzone">
+            <div class="drop-icon">📤</div>
+            <div class="drop-text">فایل‌ها را بکشید و اینجا رها کنید یا کلیک کنید</div>
+            <input type="file" id="fileInput" multiple style="display: none;">
+            <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">
+              انتخاب فایل‌ها از گوشی
+            </button>
+          </div>
+
+          <div class="upload-queue" id="uploadQueue"></div>
+          <button id="btnUploadSubmit" class="btn-primary mt-3" style="display: none;">
+            شروع آپلود به گوشی فرستنده
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Media Preview Modal -->
+    <div class="modal" id="mediaModal">
+      <div class="modal-backdrop" id="modalBackdrop"></div>
+      <div class="modal-content">
+        <button class="modal-close" id="modalClose">&times;</button>
+        <div class="modal-body" id="modalBody"></div>
+      </div>
+    </div>
+
+    <!-- QR Code Trigger Button in Footer -->
+    <footer class="footer">
+      <div class="footer-info">
+        <span>HyperShare Engine v2.0 • Ultra 5GHz P2P</span>
+      </div>
+      <button id="btnShowQR" class="qr-trigger-btn" title="نمایش بارکد اتصال">
+        <span>بارکد اتصال</span> 📱
+      </button>
+    </footer>
+
+    <!-- QR Code Modal -->
+    <div class="modal" id="qrModal">
+      <div class="modal-backdrop" id="qrModalBackdrop"></div>
+      <div class="modal-content qr-modal-box">
+        <button class="modal-close" id="qrModalClose">&times;</button>
+        <h3>اتصال آسان با بارکد (QR Code)</h3>
+        <p>دوربین گوشی دوم را روبروی این تصویر بگیرید تا درجا متصل شود:</p>
+        <div class="qr-image-wrapper">
+          <img id="qrImage" src="/api/qr/url" alt="QR Code">
+        </div>
+        <div class="qr-tabs">
+          <button class="qr-tab-btn active" id="qrTabUrl">لینک دانلود مستقیم</button>
+          <button class="qr-tab-btn" id="qrTabWifi">وای‌فای ۵ گیگاهرتز</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

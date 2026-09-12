@@ -1,0 +1,76 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.hypershare.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.hypershare.app"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("../keystore/release.jks")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "hypershare2026"
+            keyAlias System.getenv("KEY_ALIAS") ?: "hypershare"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "hypershare2026"
+            v1SigningEnabled true
+            v2SigningEnabled true
+            v3SigningEnabled true
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.webkit:webkit:1.10.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+
+    // Barcode scanner (ZXing)
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    implementation 'com.google.zxing:core:3.5.3'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+}
