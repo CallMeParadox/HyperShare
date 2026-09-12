@@ -20,6 +20,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnAddFiles = document.getElementById('btnAddFiles');
   const btnPickFilesNative = document.getElementById('btnPickFilesNative');
   const fileInput = document.getElementById('fileInput');
+  const btnOpenSharedFolder = document.getElementById('btnOpenSharedFolder');
+  const btnOpenReceivedFolder = document.getElementById('btnOpenReceivedFolder');
+
+  // Show PC specific buttons if not inside Android app
+  if (!window.AndroidBridge) {
+    if (btnOpenSharedFolder) btnOpenSharedFolder.style.display = 'inline-flex';
+    if (btnOpenReceivedFolder) btnOpenReceivedFolder.style.display = 'inline-flex';
+  }
+
+  btnOpenSharedFolder?.addEventListener('click', () => {
+    fetch('/api/open-folder?type=shared');
+  });
+
+  btnOpenReceivedFolder?.addEventListener('click', () => {
+    fetch('/api/open-folder?type=received');
+  });
+
+  btnAddFiles?.addEventListener('click', async () => {
+    if (window.AndroidBridge && window.AndroidBridge.pickFilesForSharing) {
+      window.AndroidBridge.pickFilesForSharing();
+    } else if (window.AndroidBridge && window.AndroidBridge.pickFiles) {
+      window.AndroidBridge.pickFiles();
+    } else {
+      // Windows PC native file picker
+      try {
+        btnAddFiles.disabled = true;
+        const origText = btnAddFiles.innerHTML;
+        btnAddFiles.innerHTML = '⏳ در حال انتخاب فایل از ویندوز...';
+        const res = await fetch('/api/pick-pc-files', { method: 'POST' });
+        const data = await res.json();
+        if (data.count > 0) {
+          loadFiles();
+        }
+      } catch (err) {
+        console.error('File pick error:', err);
+      } finally {
+        btnAddFiles.disabled = false;
+        btnAddFiles.innerHTML = '➕ افزودن فایل برای اشتراک و ارسال';
+      }
+    }
+  });
 
   // Load Initial Network Info
   fetch('/api/network')
@@ -99,8 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
       fileListContainer.innerHTML = `
         <div class="empty-state">
           <p>هیچ فایلی در این دسته وجود ندارد.</p>
-          <button class="btn-primary mt-2" onclick="window.AndroidBridge ? window.AndroidBridge.pickFilesForSharing() : document.getElementById('fileInput').click()">
-            ➕ افزودن فایل از گوشی
+          <button class="btn-primary mt-2" onclick="document.getElementById('btnAddFiles') ? document.getElementById('btnAddFiles').click() : null">
+            ➕ افزودن فایل برای اشتراک
           </button>
         </div>
       `;

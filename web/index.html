@@ -74,9 +74,12 @@
     <main class="content-area">
       <!-- TAB 1: Files List -->
       <section id="tab-files" class="tab-content active">
-        <div class="top-action-banner" style="display: flex; gap: 8px;">
-          <button id="btnAddFiles" class="btn-primary glow-btn add-files-btn" style="flex: 1;">
+        <div class="top-action-banner" style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="btnAddFiles" class="btn-primary glow-btn add-files-btn" style="flex: 2; min-width: 200px;">
             ➕ افزودن فایل برای اشتراک و ارسال
+          </button>
+          <button id="btnOpenSharedFolder" class="btn-secondary" title="باز کردن پوشه اشتراک در کامپیوتر" style="white-space: nowrap; display: none;">
+            📂 پوشه اشتراک
           </button>
           <button id="btnClearAllFiles" class="btn-secondary danger-btn" title="پاک کردن تمام فایل‌های لیست" style="white-space: nowrap;">
             🗑️ پاک کردن همه
@@ -198,8 +201,13 @@
       <section id="tab-upload" class="tab-content">
         <div class="card">
           <div class="transfer-direction-guide">
-            <span class="guide-badge">📱 ⇄ 💻 انتقال دوطرفه</span>
-            <p class="guide-text">فایل‌هایی که در این بخش انتخاب می‌کنید مستقیماً با حداکثر سرعت ۵ گیگاهرتز به دستگاه مقابل فرستاده و روی حافظه آن ذخیره می‌شوند.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <span class="guide-badge">📱 ⇄ 💻 انتقال دوطرفه</span>
+              <button id="btnOpenReceivedFolder" class="btn-secondary text-sm" style="display: none; background: rgba(0, 240, 255, 0.15); border-color: var(--accent-cyan); cursor: pointer;">
+                📂 باز کردن پوشه فایل‌های دریافتی در کامپیوتر
+              </button>
+            </div>
+            <p class="guide-text" style="margin-top: 8px;">فایل‌هایی که در این بخش انتخاب می‌کنید مستقیماً با حداکثر سرعت ۵ گیگاهرتز به دستگاه مقابل فرستاده و روی حافظه آن ذخیره می‌شوند.</p>
           </div>
 
           <div class="dropzone" id="dropzone">

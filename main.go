@@ -16,9 +16,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"hypershare/engine"
+
+	"github.com/jchv/go-webview2"
 )
 
 //go:embed web/*
@@ -130,6 +131,21 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "count": count})
 	})
 
+	// Windows Explorer Open Folder API
+	mux.HandleFunc("/api/open-folder", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		if runtime.GOOS == "windows" {
+			folder := r.URL.Query().Get("type")
+			target := absUpload
+			if folder == "shared" {
+				target = absDir
+			}
+			exec.Command("explorer.exe", target).Start()
+		}
+		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	})
+
 	mux.HandleFunc("/api/download/", func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/download")
 		engine.HandleFileDownload(absDir, true)(w, r)
@@ -159,25 +175,39 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
-	// Auto-launch browser on Windows PC
-	targetURL := fmt.Sprintf("http://localhost:%d", actualPort)
+	targetURL := fmt.Sprintf("http://127.0.0.1:%d", actualPort)
+
+	// Start HTTP Server in background
+	server := &http.Server{Handler: mux}
 	go func() {
-		time.Sleep(500 * time.Millisecond)
-		openURL(targetURL)
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			log.Printf("Server stopped: %v", err)
+		}
 	}()
 
-	fmt.Println("==================================================================")
-	fmt.Printf("🟢 سرور هایپرشیر با موفقیت فعال شد: %s\n", targetURL)
-	fmt.Println("📱 پنجره نرم‌افزار در مرورگر شما باز شد.")
-	fmt.Println("ℹ️  برای خروج و خاموش کردن برنامه، می‌توانید این پنجره را ببندید.")
-	fmt.Println("==================================================================")
-
-	server := &http.Server{Handler: mux}
-	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-		fmt.Printf("\n❌ خطا در اجرای هایپرشیر: %v\n", err)
-		fmt.Println("برای خروج کلید اینتر را فشار دهید...")
-		bufio.NewReader(os.Stdin).ReadBytes('\n')
+	// Launch Standalone Native Desktop Window (No browser, no console!)
+	opts := webview2.WebViewOptions{
+		Debug: false,
+		WindowOptions: webview2.WindowOptions{
+			Title:  "⚡ HyperShare PC - انتقال پرسرعت بی‌سیم (آفلاین)",
+			Width:  1060,
+			Height: 740,
+			Center: true,
+		},
 	}
+	w := webview2.NewWithOptions(opts)
+	if w != nil {
+		defer w.Destroy()
+		w.Navigate(targetURL)
+		w.Run()
+		// Clean exit when desktop window is closed
+		server.Close()
+		return
+	}
+
+	// Fallback to browser if WebView2 runtime is not available
+	openURL(targetURL)
+	select {}
 }
 
 func openURL(url string) {
