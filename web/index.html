@@ -50,7 +50,7 @@
     <nav class="nav-tabs">
       <button class="tab-btn active" data-tab="files">
         <span class="tab-icon">📁</span>
-        <span>فایل‌ها</span>
+        <span>فایل‌های ارسالی</span>
       </button>
       <button class="tab-btn" data-tab="turbo">
         <span class="tab-icon">🚀</span>
@@ -74,6 +74,12 @@
     <main class="content-area">
       <!-- TAB 1: Files List -->
       <section id="tab-files" class="tab-content active">
+        <div class="top-action-banner">
+          <button id="btnAddFiles" class="btn-primary glow-btn add-files-btn">
+            ➕ افزودن فیلم، عکس، برنامه یا آهنگ برای ارسال
+          </button>
+        </div>
+
         <div class="filter-bar">
           <div class="category-chips">
             <button class="chip active" data-cat="all">همه</button>
@@ -83,8 +89,8 @@
             <button class="chip" data-cat="app">برنامه‌ها (APK)</button>
             <button class="chip" data-cat="document">اسناد</button>
           </div>
-          <button id="btnDownloadAll" class="btn-primary glow-btn">
-            ⚡ دریافت همه (ZIP)
+          <button id="btnDownloadAll" class="btn-secondary">
+            دریافت همه (ZIP)
           </button>
         </div>
 
@@ -137,7 +143,7 @@
               </div>
             </div>
             <h3>تست سرعت امواج ۵ گیگاهرتز هات‌اسپات</h3>
-            <p>این تست، داده‌های مصنوعی را بدون درگیر کردن دیسک مستقیماً درون رم (RAM) استریم می‌کند تا سقف سرعت واقعی رادیویی دو گوشی مشخص شود.</p>
+            <p class="offline-notice">🟢 <strong>کاملاً آفلاین:</strong> این تست مستقیماً روی امواج محلی وای‌فای انجام می‌شود و <strong>حتی ۱ بایت هم از حجم اینترنت شما کم نمی‌کند!</strong></p>
           </div>
 
           <div class="bench-controls">
@@ -161,8 +167,8 @@
               <span class="res-val" id="benchDuration">0.0 ثانیه</span>
             </div>
             <div class="res-item">
-              <span class="res-label">کیفیت لینک:</span>
-              <span class="res-val status-green" id="benchQuality">فوق‌العاده (Ultra 5GHz)</span>
+              <span class="res-label">مصرف اینترنت:</span>
+              <span class="res-val status-green">صفر (کاملاً آفلاین)</span>
             </div>
           </div>
         </div>
@@ -188,21 +194,21 @@
       <!-- TAB 5: Upload Files Back to Sender -->
       <section id="tab-upload" class="tab-content">
         <div class="card">
-          <h3>ارسال فایل به گوشی فرستنده</h3>
-          <p class="card-desc">گیرنده می‌تواند از همینجا فایل‌های خود را برای فرستنده بفرستد (بدون نیاز به نرم‌افزار اضافی).</p>
+          <h3>ارسال فایل به دستگاه مقابل</h3>
+          <p class="card-desc">فایل‌های مورد نظر خود را برای انتقال مستقیم انتخاب کنید.</p>
 
           <div class="dropzone" id="dropzone">
             <div class="drop-icon">📤</div>
-            <div class="drop-text">فایل‌ها را بکشید و اینجا رها کنید یا کلیک کنید</div>
+            <div class="drop-text">کلیک کنید یا فایل‌ها را اینجا بکشید</div>
             <input type="file" id="fileInput" multiple style="display: none;">
-            <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">
-              انتخاب فایل‌ها از گوشی
+            <button type="button" class="btn-primary glow-btn" id="btnPickFilesNative">
+              📁 انتخاب فایل‌ها از حافظه گوشی
             </button>
           </div>
 
           <div class="upload-queue" id="uploadQueue"></div>
           <button id="btnUploadSubmit" class="btn-primary mt-3" style="display: none;">
-            شروع آپلود به گوشی فرستنده
+            شروع ارسال فایل‌ها
           </button>
         </div>
       </section>

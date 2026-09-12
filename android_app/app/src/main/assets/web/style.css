@@ -234,6 +234,21 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Add Files Banner */
+.top-action-banner {
+  margin-bottom: 14px;
+}
+
+.add-files-btn {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 /* Filter Bar & Chips */
 .filter-bar {
   display: flex;
@@ -394,6 +409,16 @@ body {
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 14px;
+}
+
+.offline-notice {
+  font-size: 13px;
+  color: var(--accent-green);
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(0, 255, 136, 0.08);
+  border: 1px solid rgba(0, 255, 136, 0.25);
+  border-radius: 12px;
 }
 
 .form-select {
@@ -568,7 +593,7 @@ body {
 }
 
 .drop-icon { font-size: 40px; margin-bottom: 10px; }
-.drop-text { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+.drop-text { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
 
 /* Modals */
 .modal {

@@ -36,6 +36,11 @@ class WebAppInterface(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun pickFilesForSharing() {
+        activity.openNativeFilePickerForSharing()
+    }
+
+    @JavascriptInterface
     fun startNative5GHzHotspot() {
         activity.runOnUiThread {
             activity.start5GHzHotspot()

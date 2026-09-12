@@ -4,11 +4,15 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
+import android.util.Log
 import android.view.View
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -18,6 +22,9 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,6 +34,50 @@ class MainActivity : AppCompatActivity() {
     private lateinit var embeddedServer: EmbeddedServer
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val backgroundExecutor = Executors.newSingleThreadExecutor()
+
+    // File chooser callback for <input type="file"> inside WebView
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
+    // Launcher for standard WebView file chooser
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val intent = result.data
+            val uris = mutableListOf<Uri>()
+            intent?.data?.let { uris.add(it) }
+            intent?.clipData?.let { clip ->
+                for (i in 0 until clip.itemCount) {
+                    uris.add(clip.getItemAt(i).uri)
+                }
+            }
+            filePathCallback?.onReceiveValue(uris.toTypedArray())
+        } else {
+            filePathCallback?.onReceiveValue(null)
+        }
+        filePathCallback = null
+    }
+
+    // Launcher for adding files to the shared folder
+    private val pickFilesLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val intent = result.data
+            val uris = mutableListOf<Uri>()
+            intent?.data?.let { uris.add(it) }
+            intent?.clipData?.let { clip ->
+                for (i in 0 until clip.itemCount) {
+                    uris.add(clip.getItemAt(i).uri)
+                }
+            }
+
+            if (uris.isNotEmpty()) {
+                copyUrisToSharedDir(uris)
+            }
+        }
+    }
 
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -48,7 +99,7 @@ class MainActivity : AppCompatActivity() {
         loadingSpinner = findViewById(R.id.loadingSpinner)
         hotspotManager = LocalOnlyHotspotManager(this)
 
-        // 1. Start the embedded high-speed server locally on port 8080
+        // 1. Start the embedded server
         embeddedServer = EmbeddedServer(applicationContext, 8080)
         embeddedServer.start()
 
@@ -56,7 +107,7 @@ class MainActivity : AppCompatActivity() {
         setupWebView()
         checkAndRequestPermissions()
 
-        // 3. Load UI from local embedded server (after 200ms warm-up)
+        // 3. Load UI from local server
         mainHandler.postDelayed({
             webView.loadUrl("http://127.0.0.1:8080")
         }, 200)
@@ -109,16 +160,93 @@ class MainActivity : AppCompatActivity() {
                     loadingSpinner.visibility = View.GONE
                 }
             }
+
+            // CRITICAL FIX: Enables HTML <input type="file"> to open Android file selector!
+            override fun onShowFileChooser(
+                mWebView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                this@MainActivity.filePathCallback = filePathCallback
+                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    type = "*/*"
+                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                }
+                fileChooserLauncher.launch(Intent.createChooser(intent, "انتخاب فایل‌ها"))
+                return true
+            }
         }
 
         webView.webViewClient = object : WebViewClient() {
             override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
-                // If local server is still starting up, retry in 500ms
                 mainHandler.postDelayed({
                     view?.loadUrl("http://127.0.0.1:8080")
                 }, 500)
             }
         }
+    }
+
+    fun openNativeFilePickerForSharing() {
+        runOnUiThread {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "*/*"
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                addCategory(Intent.CATEGORY_OPENABLE)
+            }
+            pickFilesLauncher.launch(Intent.createChooser(intent, "انتخاب فایل‌ها برای ارسال"))
+        }
+    }
+
+    private fun copyUrisToSharedDir(uris: List<Uri>) {
+        Toast.makeText(this, "در حال افزودن ${uris.size} فایل به لیست ارسال...", Toast.LENGTH_SHORT).show()
+
+        backgroundExecutor.execute {
+            val sharedDir = File(getExternalFilesDir(null), "shared")
+            if (!sharedDir.exists()) sharedDir.mkdirs()
+
+            var count = 0
+            for (uri in uris) {
+                try {
+                    val filename = getFileName(uri) ?: "shared_file_${System.currentTimeMillis()}"
+                    val destFile = File(sharedDir, filename)
+
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        FileOutputStream(destFile).use { output ->
+                            input.copyTo(output, bufferSize = 64 * 1024)
+                        }
+                    }
+                    count++
+                } catch (e: Exception) {
+                    Log.e("HyperShare", "Error copying file: ${e.message}")
+                }
+            }
+
+            mainHandler.post {
+                Toast.makeText(this, "$count فایل با موفقیت اضافه شد", Toast.LENGTH_SHORT).show()
+                webView.evaluateJavascript("if(window.loadFiles) window.loadFiles();", null)
+            }
+        }
+    }
+
+    private fun getFileName(uri: Uri): String? {
+        var name: String? = null
+        if (uri.scheme == "content") {
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val idx = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx != -1) name = it.getString(idx)
+                }
+            }
+        }
+        if (name == null) {
+            name = uri.path?.let { p ->
+                val cut = p.lastIndexOf('/')
+                if (cut != -1) p.substring(cut + 1) else p
+            }
+        }
+        return name
     }
 
     fun start5GHzHotspot() {

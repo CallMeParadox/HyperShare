@@ -17,6 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const transferredBytes = document.getElementById('transferredBytes');
   const etaTime = document.getElementById('etaTime');
   const networkStatus = document.getElementById('networkStatus');
+  const btnAddFiles = document.getElementById('btnAddFiles');
+  const btnPickFilesNative = document.getElementById('btnPickFilesNative');
+  const fileInput = document.getElementById('fileInput');
 
   // Load Initial Network Info
   fetch('/api/network')
@@ -60,6 +63,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Add Files Action Handler (Opens native file picker or fallback)
+  function triggerFilePick() {
+    if (window.AndroidBridge && window.AndroidBridge.pickFilesForSharing) {
+      window.AndroidBridge.pickFilesForSharing();
+    } else if (fileInput) {
+      fileInput.click();
+    }
+  }
+
+  btnAddFiles?.addEventListener('click', triggerFilePick);
+  btnPickFilesNative?.addEventListener('click', triggerFilePick);
+
   // Fetch & Render Files
   async function loadFiles() {
     try {
@@ -72,13 +87,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Make globally accessible so MainActivity.kt can refresh the list on file add
+  window.loadFiles = loadFiles;
+
   function renderFiles() {
     const filtered = currentCategory === 'all' 
       ? allFiles 
       : allFiles.filter(f => f.category === currentCategory);
 
     if (filtered.length === 0) {
-      fileListContainer.innerHTML = '<div class="empty-state">هیچ فایلی در این دسته یافت نشد.</div>';
+      fileListContainer.innerHTML = `
+        <div class="empty-state">
+          <p>هیچ فایلی در این دسته وجود ندارد.</p>
+          <button class="btn-primary mt-2" onclick="window.AndroidBridge ? window.AndroidBridge.pickFilesForSharing() : document.getElementById('fileInput').click()">
+            ➕ افزودن فایل از گوشی
+          </button>
+        </div>
+      `;
       return;
     }
 
@@ -214,7 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastDownloaded = 0;
     let lastTime = startTime;
 
-    // Speed tracking interval
     speedInterval = setInterval(() => {
       const now = performance.now();
       const timeDiff = (now - lastTime) / 1000;
@@ -225,13 +249,11 @@ document.addEventListener('DOMContentLoaded', () => {
       lastDownloaded = totalDownloaded;
       lastTime = now;
 
-      // Update total progress
       const percent = Math.min(100, Math.round((totalDownloaded / totalSize) * 100));
       transferPercent.textContent = `${percent}%`;
       progressBar.style.width = `${percent}%`;
       transferredBytes.textContent = `${(totalDownloaded / (1024*1024)).toFixed(1)} MB / ${(totalSize / (1024*1024)).toFixed(1)} MB`;
 
-      // ETA
       if (mbps > 0) {
         const remainingBytes = totalSize - totalDownloaded;
         const etaSec = remainingBytes / (mbps * 1024 * 1024);
@@ -239,7 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }, 400);
 
-    // Parallel Range fetch workers
     const promises = [];
     for (let i = 0; i < numChunks; i++) {
       const start = i * chunkSize;
@@ -279,7 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
       transferPercent.textContent = '100% (تکمیل)';
       etaTime.textContent = 'انجام شد!';
 
-      // Merge chunks into a single file and trigger download
+      if (window.AndroidBridge && window.AndroidBridge.vibrate) {
+        window.AndroidBridge.vibrate(200);
+      }
+
       const finalBlob = new Blob(blobs);
       const url = URL.createObjectURL(finalBlob);
       const a = document.createElement('a');
@@ -331,7 +355,6 @@ document.addEventListener('DOMContentLoaded', () => {
       benchPeakSpeed.textContent = speed.toFixed(1);
       currentSpeed.textContent = speed.toFixed(1);
 
-      // Dial rotation (assuming max dial is 150 MB/s)
       const ratio = Math.min(1, speed / 150);
       dialMeter.style.strokeDashoffset = 251 - (251 * ratio);
 
@@ -357,6 +380,10 @@ document.addEventListener('DOMContentLoaded', () => {
       benchAvgSpeed.textContent = `${avgMBps.toFixed(1)} MB/s`;
       benchDuration.textContent = `${totalTimeSec.toFixed(2)} ثانیه`;
       benchResults.style.display = 'block';
+
+      if (window.AndroidBridge && window.AndroidBridge.vibrate) {
+        window.AndroidBridge.vibrate(100);
+      }
     } catch (err) {
       clearInterval(meterInterval);
       alert(`خطای بنچمارک: ${err.message}`);
@@ -406,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
     await fetch('/api/clipboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: text, sender: 'Web Peer' })
+      body: JSON.stringify({ content: text, sender: 'Mobile' })
     });
 
     clipInput.value = '';
@@ -423,7 +450,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Reverse File Upload (Web to Sender)
   // ----------------------------------------------------
   const dropzone = document.getElementById('dropzone');
-  const fileInput = document.getElementById('fileInput');
   const uploadQueue = document.getElementById('uploadQueue');
   const btnUploadSubmit = document.getElementById('btnUploadSubmit');
   let selectedUploadFiles = [];
@@ -473,15 +499,15 @@ document.addEventListener('DOMContentLoaded', () => {
         body: formData
       });
       const result = await res.json();
-      alert(`با موفقیت ${result.count} فایل به فرستنده ارسال شد!`);
+      alert(`با موفقیت ${result.count} فایل ارسال شد!`);
       selectedUploadFiles = [];
       renderUploadQueue();
-      loadFiles(); // Refresh files list
+      loadFiles();
     } catch (err) {
-      alert(`خطا در آپلود: ${err.message}`);
+      alert(`خطا در ارسال فایل: ${err.message}`);
     } finally {
       btnUploadSubmit.disabled = false;
-      btnUploadSubmit.textContent = 'شروع آپلود به گوشی فرستنده';
+      btnUploadSubmit.textContent = 'شروع ارسال فایل‌ها';
     }
   });
 
