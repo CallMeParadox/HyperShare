@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"embed"
 	"encoding/json"
 	"flag"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -44,8 +46,18 @@ func main() {
 	}
 	os.MkdirAll(absUpload, 0755)
 
+	// Automatically find an available port if preferred is busy
+	actualPort, listener, err := findFreePort(*portFlag)
+	if err != nil {
+		fmt.Printf("❌ خطا در انتخاب پورت شبکه: %v\n", err)
+		fmt.Println("کلید اینتر را بزنید...")
+		bufio.NewReader(os.Stdin).ReadBytes('\n')
+		return
+	}
+	defer listener.Close()
+
 	// Detect Network and IPs
-	netInfo, err := engine.GetNetworkInfo(*portFlag)
+	netInfo, err := engine.GetNetworkInfo(actualPort)
 	if err != nil {
 		log.Printf("Warning: failed to detect network info: %v", err)
 	}
@@ -148,26 +160,75 @@ func main() {
 	})
 
 	// Auto-launch browser on Windows PC
+	targetURL := fmt.Sprintf("http://localhost:%d", actualPort)
 	go func() {
-		time.Sleep(600 * time.Millisecond)
-		openURL(fmt.Sprintf("http://localhost:%d", *portFlag))
+		time.Sleep(500 * time.Millisecond)
+		openURL(targetURL)
 	}()
 
-	serverAddr := fmt.Sprintf("0.0.0.0:%d", *portFlag)
-	log.Printf("HyperShare listening on %s (Opening browser)...", serverAddr)
-	if err := http.ListenAndServe(serverAddr, mux); err != nil {
-		log.Fatalf("HTTP server error: %v", err)
+	fmt.Println("==================================================================")
+	fmt.Printf("🟢 سرور هایپرشیر با موفقیت فعال شد: %s\n", targetURL)
+	fmt.Println("📱 پنجره نرم‌افزار در مرورگر شما باز شد.")
+	fmt.Println("ℹ️  برای خروج و خاموش کردن برنامه، می‌توانید این پنجره را ببندید.")
+	fmt.Println("==================================================================")
+
+	server := &http.Server{Handler: mux}
+	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+		fmt.Printf("\n❌ خطا در اجرای هایپرشیر: %v\n", err)
+		fmt.Println("برای خروج کلید اینتر را فشار دهید...")
+		bufio.NewReader(os.Stdin).ReadBytes('\n')
 	}
 }
 
 func openURL(url string) {
 	if runtime.GOOS == "windows" {
-		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		chromePath := findChromePath()
+		if chromePath != "" {
+			cmd := exec.Command(chromePath, "--app="+url)
+			if err := cmd.Start(); err == nil {
+				return
+			}
+		}
+		// Fallback to system default browser
+		exec.Command("cmd", "/c", "start", "", url).Start()
 	} else if runtime.GOOS == "darwin" {
 		exec.Command("open", url).Start()
 	} else {
 		exec.Command("xdg-open", url).Start()
 	}
+}
+
+func findChromePath() string {
+	candidates := []string{
+		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
+		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
+		os.Getenv("LOCALAPPDATA") + `\Google\Chrome\Application\chrome.exe`,
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	return ""
+}
+
+func findFreePort(preferred int) (int, net.Listener, error) {
+	ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", preferred))
+	if err == nil {
+		return preferred, ln, nil
+	}
+	for p := 8081; p <= 8099; p++ {
+		ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", p))
+		if err == nil {
+			return p, ln, nil
+		}
+	}
+	ln, err = net.Listen("tcp", "0.0.0.0:0")
+	if err == nil {
+		p := ln.Addr().(*net.TCPAddr).Port
+		return p, ln, nil
+	}
+	return 0, nil, err
 }
 
 func copyFile(src, dst string) error {

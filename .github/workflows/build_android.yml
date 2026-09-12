@@ -71,17 +71,18 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
-        tag_name: v1.0.4
-        name: "HyperShare v1.0.4 (Zero-Copy Instant File Pick, Bi-directional & PC App)"
+        tag_name: v1.0.5
+        name: "HyperShare v1.0.5 (Windows PC App Auto-Launch & Dynamic Port Fix)"
         body: |
-          ### ⚡ HyperShare v1.0.4 - Major Upgrade
-          - **Instant Zero-Copy File Selection**: Files appear on screen in milliseconds without heavy copying or disk caching.
-          - **Bidirectional Transfer (/api/upload)**: Full 5GHz streaming upload from PC/browser directly into device storage with live progress.
-          - **Cancel & Delete Controls**: Remove individual files or clear entire queues on both sharing and upload tabs.
-          - **HyperShare PC App**: Standalone Windows executable (`HyperShare_PC.exe`) with auto-browser launch and native Windows file chooser.
-          - **app-release.apk**: Universal Signed APK (Android phone install)
-          - **app-release.aab**: Official Google Play Store bundle
-          - **HyperShare_PC.exe**: Windows PC desktop app
+          ### ⚡ HyperShare v1.0.5 - Release Highlights
+          - **Windows PC Standalone App Fix**: Added automatic Chrome App Mode / system browser launch so `HyperShare_PC.exe` opens immediately in a clean desktop window.
+          - **Dynamic Port Collision Resolver**: If port 8080 is busy or in use, automatically binds to the next free port (8081-8099) without closing or crashing.
+          - **Zero-Copy File Picker**: Lightning-fast file selection without copying files into internal app storage.
+          - **Bidirectional File Transfers**: Send and receive files seamlessly between Android and Windows PC.
+          - **app-release.apk**: Universal Signed APK for Android
+          - **app-release.aab**: Google Play Store Bundle
+          - **HyperShare_PC.exe**: Windows PC Desktop App
+          - **Run_HyperShare.bat**: One-click Windows launcher script
         files: |
           android_app/app/build/outputs/apk/release/*.apk
           android_app/app/build/outputs/bundle/release/*.aab
