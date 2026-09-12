@@ -67,10 +67,10 @@ func ListFiles(sharedDir string) ([]FileItem, error) {
 		return nil, err
 	}
 
-	var items []FileItem
+	items := make([]FileItem, 0)
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue // Handle folders separately or recursively
+		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue // Skip folders and hidden files like .gitkeep
 		}
 
 		info, err := entry.Info()

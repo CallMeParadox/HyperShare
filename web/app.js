@@ -120,7 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadFiles() {
     try {
       const res = await fetch('/api/files');
-      allFiles = await res.json();
+      const data = await res.json();
+      allFiles = Array.isArray(data) ? data : [];
       renderFiles();
       populateTurboSelect();
     } catch (err) {
@@ -132,9 +133,10 @@ document.addEventListener('DOMContentLoaded', () => {
   window.loadFiles = loadFiles;
 
   function renderFiles() {
-    const filtered = currentCategory === 'all' 
+    if (!Array.isArray(allFiles)) allFiles = [];
+    const filtered = (currentCategory === 'all' 
       ? allFiles 
-      : allFiles.filter(f => f.category === currentCategory);
+      : allFiles.filter(f => f && f.category === currentCategory)) || [];
 
     if (filtered.length === 0) {
       fileListContainer.innerHTML = `
@@ -219,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Populate Turbo Select Box
   function populateTurboSelect() {
     if (!turboFileSelect) return;
-    if (allFiles.length === 0) {
+    if (!Array.isArray(allFiles) || allFiles.length === 0) {
       turboFileSelect.innerHTML = '<option value="">هیچ فایلی موجود نیست</option>';
       btnStartTurbo.disabled = true;
       return;
@@ -238,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Clear All Files
   document.getElementById('btnClearAllFiles')?.addEventListener('click', async () => {
-    if (allFiles.length === 0) return;
+    if (!Array.isArray(allFiles) || allFiles.length === 0) return;
     if (confirm('آیا می‌خواهید تمام فایل‌ها را از لیست ارسالی‌ها پاک کنید؟')) {
       await fetch('/api/files/delete', {
         method: 'POST',
