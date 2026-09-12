@@ -62,13 +62,12 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
-        tag_name: v1.0.2
-        name: "HyperShare v1.0.2 (Native File Picker Support)"
+        tag_name: v1.0.3
+        name: "HyperShare v1.0.3 (Status Bar & Idle UI Fix)"
         body: |
-          ### ⚡ HyperShare v1.0.2 - Native File Picker & Offline Enhancement
-          - **Native File Picker Support**: Added `onShowFileChooser` and native file picker button for instant selection of videos, photos, APKs from device storage.
-          - **Dynamic File Sharing**: Selected files are instantly added to the 5GHz P2P share queue.
-          - **100% Offline Speedometer**: Zero internet data consumed during speed benchmarks.
+          ### ⚡ HyperShare v1.0.3 - UI & Notification Polish
+          - **Fixed Status Bar Icon**: Replaced system download/upload arrow with app icon so users don't think an endless download is occurring.
+          - **Fixed Idle Progress Bar**: Hidden idle progress bars to avoid confusion when no transfer is happening.
           - **app-release.apk**: Universal Signed APK (Ready to install)
           - **app-release.aab**: Signed Android App Bundle (Google Play Console)
         files: |

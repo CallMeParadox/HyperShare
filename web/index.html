@@ -33,15 +33,15 @@
       </div>
       <div class="speed-details">
         <div class="transfer-info">
-          <span id="transferFileName">آماده دریافت یا ارسال</span>
-          <span id="transferPercent">0%</span>
+          <span id="transferFileName">⚡ آماده به کار (هیچ دانلودی در جریان نیست)</span>
+          <span id="transferPercent"></span>
         </div>
-        <div class="progress-bar-bg">
+        <div class="progress-bar-bg" id="progressBarBg" style="display: none;">
           <div class="progress-bar-fill" id="progressBar"></div>
         </div>
-        <div class="transfer-stats">
-          <span id="transferredBytes">0 MB / 0 MB</span>
-          <span id="etaTime">ETA: --</span>
+        <div class="transfer-stats" id="transferStats" style="display: none;">
+          <span id="transferredBytes"></span>
+          <span id="etaTime"></span>
         </div>
       </div>
     </section>

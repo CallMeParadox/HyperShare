@@ -23,7 +23,7 @@ class HyperShareService : Service() {
         super.onCreate()
         createNotificationChannel()
 
-        // Acquire high-performance locks to prevent battery optimization from throttling 5GHz transfers
+        // High-performance locks
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HyperShare::TransferWakeLock")
         wakeLock?.acquire(2 * 60 * 60 * 1000L) // 2 hours max
@@ -39,21 +39,22 @@ class HyperShareService : Service() {
         )
         wifiLock?.acquire()
 
-        // Ensure server stays running in foreground
+        // Embedded server
         embeddedServer = EmbeddedServer(applicationContext, 8080)
         embeddedServer?.start()
 
-        startForeground(NOTIFICATION_ID, buildNotification("HyperShare فعال است", "آماده انتقال پرسرعت ۵ گیگاهرتز"))
+        startForeground(NOTIFICATION_ID, buildNotification("هایپرشیر آماده به کار", "آماده انتقال فایل (هیچ دانلودی در جریان نیست)"))
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "انتقال فایل HyperShare",
+                "وضعیت هایپرشیر",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "سرویس فعال نگه‌داشتن هات‌اسپات و انتقال فایل"
+                description = "نمایش وضعیت آماده‌به‌کار هایپرشیر"
+                setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
@@ -70,9 +71,10 @@ class HyperShareService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            // Use app's own icon instead of misleading system download arrow!
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
-            .setOngoing(true)
+            .setOngoing(false)
             .build()
     }
 
