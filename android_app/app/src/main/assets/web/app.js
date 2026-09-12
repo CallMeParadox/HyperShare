@@ -663,16 +663,16 @@ document.addEventListener('DOMContentLoaded', () => {
               <span>${file.category.toUpperCase()}</span>
             </div>
           </div>
-          <div class="file-actions">
+          <div class="file-actions" style="display: flex; gap: 8px; align-items: center;">
+            <span class="file-ready-tag" style="font-size: 11px; color: var(--paradox-teal); background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 6px; padding: 3px 8px; white-space: nowrap;">
+              ✓ آماده ارسال
+            </span>
             ${canPreview ? `
-              <button class="action-icon-btn preview-btn" data-url="${file.preview_url}" data-type="${file.category}" data-title="${escapeHtml(file.name)}">
+              <button class="action-icon-btn preview-btn" data-url="${file.preview_url}" data-type="${file.category}" data-title="${escapeHtml(file.name)}" title="پیش‌نمایش">
                 👁️ پیش‌نمایش
               </button>
             ` : ''}
-            <a href="${downloadUrl}" class="action-icon-btn dl-btn" download="${escapeHtml(file.name)}">
-              ⬇️ دریافت
-            </a>
-            <button class="action-icon-btn delete-btn danger-icon-btn" data-id="${file.id || ''}" data-name="${escapeHtml(file.name)}" title="حذف از لیست">
+            <button class="action-icon-btn delete-btn danger-icon-btn" data-id="${file.id || ''}" data-name="${escapeHtml(file.name)}" title="حذف از لیست ارسالی‌ها">
               🗑️
             </button>
           </div>
