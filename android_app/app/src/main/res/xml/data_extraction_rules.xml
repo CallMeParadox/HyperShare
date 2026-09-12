@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <exclude path="received/" />
+        <exclude domain="file" path="received/" />
     </cloud-backup>
     <device-transfer>
         <include domain="file" path="." />
