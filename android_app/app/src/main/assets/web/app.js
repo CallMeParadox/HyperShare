@@ -1064,6 +1064,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    window.onHotspotStarted = function(ssid, passphrase, is5GHz) {
+      if (networkStatus) {
+        networkStatus.textContent = is5GHz ? '5GHz Hotspot (فعال)' : 'Hotspot P2P (فعال)';
+        networkStatus.style.color = 'var(--paradox-green)';
+      }
+      alert(`✅ هات‌اسپات پرسرعت هایپرشیر فعال شد!\n\nنام وای‌فای: ${ssid}\nرمز عبور: ${passphrase || 'بدون رمز'}\n\nاکنون کامپیوتر یا دستگاه دوم را به این وای‌فای متصل کنید.`);
+    };
+
     // Check actual Wi-Fi frequency
     try {
       if (window.AndroidBridge.getWifiFrequency) {
