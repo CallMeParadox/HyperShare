@@ -71,16 +71,16 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
-        tag_name: v1.0.7
-        name: "HyperShare v1.0.7 (Sender & Receiver Roles, Camera Scanner, Real-Time Live Sync)"
+        tag_name: v1.0.8
+        name: "HyperShare v1.0.8 (Paradox Brand UI Overhaul - Coral Red & Tropical Turquoise 3D Pop)"
         body: |
-          ### ⚡ HyperShare v1.0.7 - Huge Feature Release
-          - **Sender & Receiver Role Selector**: Choose whether this device is **Sender (ارسال)** or **Receiver (دریافت)** upon opening or toggle anytime from the top bar!
-          - **Real-Time Live Sync (همگام‌سازی بلادرنگ)**: In Receiver mode, any file added or deleted on the Sender instantly reflects on the Receiver screen within 1.5 seconds without page reload!
-          - **Auto-Discovery & Connect**: Automatically probes and detects the phone/sender on the local Wi-Fi hotspot (`/api/find-sender`).
-          - **Camera QR Scanner**: Mobile receivers can point their camera at the sender's QR code to connect and load files in 2 seconds.
-          - **Fixed Null Length Bug**: Fixed edge-case when files list was empty.
-          - **100% Standalone Native Desktop Window**: Powered by WebView2 without console or browser dependency.
+          ### 🎨 HyperShare v1.0.8 - Complete Paradox Brand UI Overhaul
+          - **Full Paradox Brand Design System**: Re-crafted the entire user interface based on the official Paradox identity (vibrant Coral Red `#FF4D5E`, Tropical Turquoise `#00C2CB`, crisp 3D white stickers, and tactile puffy buttons).
+          - **3D Tactile Buttons & Cards**: Physical lift with drop shadows and playful micro-animations.
+          - **Sender & Receiver Dual Roles**: Select whether you are Sender or Receiver upon opening, with instant role switching.
+          - **Real-Time Live Sync**: Any file added or deleted by the sender automatically updates on the receiver screen in 1.5 seconds.
+          - **Camera QR Scanner & Auto-Discovery**: Connect via camera scan or automatic Wi-Fi gateway detection.
+          - **100% Native Windows App**: Desktop window powered by WebView2 without console or browser tabs.
           
           ### 📦 Download Assets:
           - **HyperShare_PC.exe**: Windows Desktop App (Double-click to run native window)
