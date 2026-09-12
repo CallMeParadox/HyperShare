@@ -980,15 +980,22 @@ document.addEventListener('DOMContentLoaded', () => {
         window.AndroidBridge.vibrate(200);
       }
 
-      const finalBlob = new Blob(blobs, { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(finalBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      if (window.AndroidBridge) {
+        // On Android, trigger native DownloadManager to save directly into Downloads/HyperShare
+        const downloadUrl = `${baseHost}/api/download/${encodeURIComponent(filename)}`;
+        window.location.href = downloadUrl;
+      } else {
+        // On PC / Windows Desktop, download the assembled multi-stream Blob
+        const finalBlob = new Blob(blobs, { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(finalBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
 
       setTimeout(() => {
         if (!window.isManualSpeedActive && chunkContainer) {

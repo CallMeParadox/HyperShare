@@ -220,9 +220,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // CRITICAL FIX: Enables file and zip downloads directly to phone's Downloads folder
         webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
             try {
+                if (url == null || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+                    return@setDownloadListener
+                }
                 val request = DownloadManager.Request(Uri.parse(url))
                 val filename = URLUtil.guessFileName(url, contentDisposition, mimetype)
                 request.setMimeType(mimetype)
@@ -230,7 +232,13 @@ class MainActivity : AppCompatActivity() {
                 request.setDescription("HyperShare Transfer")
                 request.setTitle(filename)
                 request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                try {
+                    val hsDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "HyperShare")
+                    if (!hsDir.exists()) hsDir.mkdirs()
+                    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "HyperShare/$filename")
+                } catch (e: Exception) {
+                    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                }
 
                 val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
                 dm.enqueue(request)
