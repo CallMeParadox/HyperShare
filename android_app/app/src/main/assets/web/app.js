@@ -354,10 +354,15 @@ document.addEventListener('DOMContentLoaded', () => {
       cameraStream.getTracks().forEach(t => t.stop());
       cameraStream = null;
     }
-    if (cameraScanModal) cameraScanModal.style.display = 'none';
+    if (cameraScanModal) {
+      cameraScanModal.style.display = 'none';
+      cameraScanModal.classList.remove('open');
+    }
   }
 
+  const cameraModalBackdrop = document.getElementById('cameraModalBackdrop');
   cameraModalClose?.addEventListener('click', closeCameraModal);
+  cameraModalBackdrop?.addEventListener('click', closeCameraModal);
   btnCancelCamera?.addEventListener('click', closeCameraModal);
 
   function startBarcodeDetection() {
@@ -591,11 +596,22 @@ document.addEventListener('DOMContentLoaded', () => {
       content = `<img src="${url}" alt="${title}" style="max-width:100%; max-height:75vh; border-radius:12px;">`;
     }
     modalBody.innerHTML = `<h4>${title}</h4><div style="margin-top:14px;">${content}</div>`;
-    mediaModal.classList.add('open');
+    if (mediaModal) {
+      mediaModal.style.display = 'flex';
+      mediaModal.classList.add('open');
+    }
   }
 
-  modalClose?.addEventListener('click', () => mediaModal.classList.remove('open'));
-  modalBackdrop?.addEventListener('click', () => mediaModal.classList.remove('open'));
+  function closeMediaModal() {
+    if (mediaModal) {
+      mediaModal.style.display = 'none';
+      mediaModal.classList.remove('open');
+      modalBody.innerHTML = '';
+    }
+  }
+
+  modalClose?.addEventListener('click', closeMediaModal);
+  modalBackdrop?.addEventListener('click', closeMediaModal);
 
   // ----------------------------------------------------
   // Turbo Multi-Stream Parallel Downloader (8 Streams)
@@ -1031,9 +1047,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const qrTabUrl = document.getElementById('qrTabUrl');
   const qrTabWifi = document.getElementById('qrTabWifi');
 
-  btnShowQR?.addEventListener('click', () => qrModal.classList.add('open'));
-  qrModalClose?.addEventListener('click', () => qrModal.classList.remove('open'));
-  qrModalBackdrop?.addEventListener('click', () => qrModal.classList.remove('open'));
+  const openQRModal = () => {
+    if (qrModal) {
+      qrModal.style.display = 'flex';
+      qrModal.classList.add('open');
+    }
+  };
+  const closeQRModal = () => {
+    if (qrModal) {
+      qrModal.style.display = 'none';
+      qrModal.classList.remove('open');
+    }
+  };
+
+  btnShowQR?.addEventListener('click', openQRModal);
+  qrModalClose?.addEventListener('click', closeQRModal);
+  qrModalBackdrop?.addEventListener('click', closeQRModal);
 
   qrTabUrl?.addEventListener('click', () => {
     qrTabUrl.classList.add('active');

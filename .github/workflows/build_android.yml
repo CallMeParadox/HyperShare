@@ -71,12 +71,12 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
-        tag_name: v1.0.8
-        name: "HyperShare v1.0.8 (Paradox Brand UI Overhaul - Coral Red & Tropical Turquoise 3D Pop)"
+        tag_name: v1.0.9
+        name: "HyperShare v1.0.9 (Fix QR Modal Startup & Close Button)"
         body: |
-          ### 🎨 HyperShare v1.0.8 - Complete Paradox Brand UI Overhaul
+          ### 🚀 HyperShare v1.0.9
+          - **Fix QR Modal Stuck on Launch**: Fixed an issue where the Easy Connection QR modal was rendered by default and could not be closed via the 'X' button due to a CSS display rule bug.
           - **Full Paradox Brand Design System**: Re-crafted the entire user interface based on the official Paradox identity (vibrant Coral Red `#FF4D5E`, Tropical Turquoise `#00C2CB`, crisp 3D white stickers, and tactile puffy buttons).
-          - **3D Tactile Buttons & Cards**: Physical lift with drop shadows and playful micro-animations.
           - **Sender & Receiver Dual Roles**: Select whether you are Sender or Receiver upon opening, with instant role switching.
           - **Real-Time Live Sync**: Any file added or deleted by the sender automatically updates on the receiver screen in 1.5 seconds.
           - **Camera QR Scanner & Auto-Discovery**: Connect via camera scan or automatic Wi-Fi gateway detection.
