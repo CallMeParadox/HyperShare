@@ -85,13 +85,28 @@ func (t *TransferTracker) EndTransfer() {
 	t.lastActivityTime = time.Now()
 }
 
+func (t *TransferTracker) Reset() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	atomic.StoreInt32(&t.activeCount, 0)
+	t.direction = ""
+	t.filename = ""
+	t.totalBytes = 0
+	t.transferredBytes = 0
+	t.lastSpeedMBps = 0.0
+	t.lastActivityTime = time.Time{}
+}
+
 func (t *TransferTracker) GetStats() TransferStats {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	running := atomic.LoadInt32(&t.activeCount) > 0
 	now := time.Now()
-	recent := running || (now.Sub(t.lastActivityTime) < 2200*time.Millisecond && t.transferredBytes > 0)
+	isRecentlyActive := !t.lastActivityTime.IsZero() && now.Sub(t.lastActivityTime) < 1800*time.Millisecond
+	isActive := running && isRecentlyActive
+	recent := isActive || (isRecentlyActive && t.transferredBytes > 0)
 
 	percent := 0
 	if t.totalBytes > 0 {
@@ -104,7 +119,7 @@ func (t *TransferTracker) GetStats() TransferStats {
 	}
 
 	speed := 0.0
-	if running {
+	if isActive {
 		speed = math.Round(t.lastSpeedMBps*10.0) / 10.0
 	}
 
@@ -142,4 +157,13 @@ func HandleStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(GlobalTracker.GetStats())
+}
+
+// HandleDisconnect resets the transfer tracker on disconnect or cancel.
+func HandleDisconnect(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Content-Type", "application/json")
+	GlobalTracker.Reset()
+	json.NewEncoder(w).Encode(map[string]string{"status": "disconnected"})
 }

@@ -1240,3 +1240,191 @@ body {
   color: #fff;
   transform: translateY(-1px);
 }
+
+/* =================================================== */
+/* 5GHz Speed Booster Banner & Hotspot Guide           */
+/* =================================================== */
+.speed-booster-banner {
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.12), rgba(0, 194, 203, 0.1));
+  border: 1px solid rgba(255, 209, 102, 0.35);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  backdrop-filter: blur(10px);
+}
+
+.booster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.booster-tag {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--paradox-yellow);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-booster-toggle {
+  background: rgba(255, 209, 102, 0.15);
+  border: 1px solid rgba(255, 209, 102, 0.4);
+  color: var(--paradox-yellow);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-booster-toggle:hover {
+  background: var(--paradox-yellow);
+  color: #000;
+}
+
+.booster-content {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 209, 102, 0.25);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.booster-desc {
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.booster-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.booster-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.booster-step .step-num {
+  background: var(--paradox-yellow);
+  color: #000;
+  font-weight: 900;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* =================================================== */
+/* 8-Stream Multi-Channel Turbo Visualizer             */
+/* =================================================== */
+.chunk-visualizer {
+  background: var(--bg-card);
+  border: 1px solid rgba(0, 194, 203, 0.3);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin: 12px 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.chunk-visualizer h4 {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--paradox-teal);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chunk-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .chunk-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.chunk-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chunk-title {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.chunk-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chunk-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--paradox-teal), var(--paradox-green));
+  border-radius: 4px;
+  transition: width 0.15s ease;
+}
+
+/* Turbo File Button on Cards */
+.btn-turbo-card {
+  background: linear-gradient(135deg, var(--paradox-coral), #ff6b4a);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 6px 13px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 10px var(--paradox-coral-glow);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-turbo-card:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 4px 15px var(--paradox-coral-glow);
+}
+
+.btn-turbo-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}

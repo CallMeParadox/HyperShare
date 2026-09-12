@@ -91,6 +91,7 @@ class EmbeddedServer(
         )
 
         private val activeCount = java.util.concurrent.atomic.AtomicInteger(0)
+        @Volatile private var cancelFlag = false
         @Volatile private var currentFilename: String = ""
         @Volatile private var currentDirection: String = ""
         @Volatile private var currentTotalBytes: Long = 0L
@@ -101,7 +102,25 @@ class EmbeddedServer(
         @Volatile private var lastSampleBytes: Long = 0L
         @Volatile private var lastActivityTime: Long = 0L
 
+        fun isCancelRequested(): Boolean = cancelFlag
+
+        fun requestCancel() {
+            cancelFlag = true
+            activeCount.set(0)
+            lastSpeedMBps = 0.0
+            lastActivityTime = 0L
+        }
+
+        fun reset() {
+            requestCancel()
+            currentFilename = ""
+            currentDirection = ""
+            currentTotalBytes = 0L
+            currentTransferredBytes = 0L
+        }
+
         fun startTransfer(filename: String, direction: String, totalBytes: Long) {
+            cancelFlag = false
             activeCount.incrementAndGet()
             currentFilename = filename
             currentDirection = direction
@@ -115,6 +134,7 @@ class EmbeddedServer(
         }
 
         fun updateProgress(bytesAdded: Long) {
+            if (cancelFlag) return
             currentTransferredBytes += bytesAdded
             val now = System.currentTimeMillis()
             lastActivityTime = now
@@ -143,9 +163,23 @@ class EmbeddedServer(
         }
 
         fun getStats(): Stats {
+            if (cancelFlag) {
+                return Stats(
+                    isActive = false,
+                    direction = "",
+                    filename = "",
+                    totalBytes = 0L,
+                    transferredBytes = 0L,
+                    speedMBps = 0.0,
+                    percent = 0
+                )
+            }
+
             val now = System.currentTimeMillis()
-            val running = activeCount.get() > 0
-            val recent = running || (now - lastActivityTime < 2200 && currentTransferredBytes > 0)
+            val hasActiveConnections = activeCount.get() > 0
+            val isRecentlyActive = (now - lastActivityTime) < 1800
+            val running = hasActiveConnections && isRecentlyActive
+            val recent = running || (isRecentlyActive && currentTransferredBytes > 0)
             val percent = if (currentTotalBytes > 0) {
                 ((currentTransferredBytes.toDouble() / currentTotalBytes.toDouble()) * 100).toInt().coerceIn(0, 100)
             } else if (!running && recent) 100 else 0
@@ -250,7 +284,8 @@ class EmbeddedServer(
                 val headerStr = "HTTP/1.1 200 OK\r\n" +
                         "Access-Control-Allow-Origin: *\r\n" +
                         "Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD\r\n" +
-                        "Access-Control-Allow-Headers: *\r\n" +
+                        "Access-Control-Allow-Headers: Range, Content-Type, Accept, Authorization, X-Requested-With\r\n" +
+                        "Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n" +
                         "Access-Control-Max-Age: 86400\r\n" +
                         "Content-Length: 0\r\n" +
                         "Connection: close\r\n\r\n"
@@ -274,6 +309,11 @@ class EmbeddedServer(
 
             // APIs
             when {
+                path == "/api/disconnect" || path == "/api/cancel-transfer" -> {
+                    TransferTracker.reset()
+                    sendResponse(output, 200, "OK", "application/json", """{"status":"disconnected"}""".toByteArray())
+                }
+
                 path == "/api/stats" -> {
                     val stats = TransferTracker.getStats()
                     val json = """{"is_active":${stats.isActive},"direction":${quote(stats.direction)},"filename":${quote(stats.filename)},"total_bytes":${stats.totalBytes},"transferred_bytes":${stats.transferredBytes},"speed_mbps":${stats.speedMBps},"percent":${stats.percent}}"""
@@ -444,7 +484,7 @@ class EmbeddedServer(
                     val buffer = ByteArray(256 * 1024)
                     var remaining = contentLength
                     if (remaining > 0) {
-                        while (remaining > 0) {
+                        while (remaining > 0 && !TransferTracker.isCancelRequested()) {
                             val toRead = if (remaining > buffer.size) buffer.size else remaining.toInt()
                             val r = input.read(buffer, 0, toRead)
                             if (r == -1) break
@@ -454,7 +494,7 @@ class EmbeddedServer(
                         }
                     } else {
                         var r: Int
-                        while (input.read(buffer).also { r = it } != -1) {
+                        while (input.read(buffer).also { r = it } != -1 && !TransferTracker.isCancelRequested()) {
                             fos.write(buffer, 0, r)
                             TransferTracker.updateProgress(r.toLong())
                         }
@@ -574,7 +614,7 @@ class EmbeddedServer(
                 return
             }
 
-            streamDataWithRange(stream, item.name, fileSize, rangeHeader, output)
+            streamDataWithRange(stream, item.name, fileSize, rangeHeader, output, pfd)
         } finally {
             try { pfd?.close() } catch (e: Exception) {}
         }
@@ -582,7 +622,44 @@ class EmbeddedServer(
 
     private fun servePhysicalFile(file: File, rangeHeader: String?, output: OutputStream) {
         val stream = FileInputStream(file)
-        streamDataWithRange(stream, file.name, file.length(), rangeHeader, output)
+        streamDataWithRange(stream, file.name, file.length(), rangeHeader, output, null)
+    }
+
+    private fun seekStream(stream: InputStream, pfd: ParcelFileDescriptor?, start: Long) {
+        if (start <= 0L) return
+
+        // 1. Try native Linux Os.lseek on ParcelFileDescriptor if available
+        if (pfd != null) {
+            try {
+                val fd = pfd.fileDescriptor
+                if (fd != null && fd.valid()) {
+                    android.system.Os.lseek(fd, start, android.system.OsConstants.SEEK_SET)
+                    return
+                }
+            } catch (e: Throwable) {
+                Log.w(TAG, "Os.lseek failed: ${e.message}, falling back to channel position")
+            }
+        }
+
+        // 2. Try FileChannel.position if stream is FileInputStream
+        if (stream is FileInputStream) {
+            try {
+                stream.channel.position(start)
+                return
+            } catch (e: Throwable) {
+                Log.w(TAG, "channel.position failed: ${e.message}, falling back to safe skip")
+            }
+        }
+
+        // 3. Fallback: Discard bytes safely and accurately
+        var remaining = start
+        val skipBuf = ByteArray(64 * 1024)
+        while (remaining > 0) {
+            val toRead = remaining.coerceAtMost(skipBuf.size.toLong()).toInt()
+            val r = stream.read(skipBuf, 0, toRead)
+            if (r <= 0) break
+            remaining -= r
+        }
     }
 
     private fun streamDataWithRange(
@@ -590,7 +667,8 @@ class EmbeddedServer(
         filename: String,
         fileSize: Long,
         rangeHeader: String?,
-        output: OutputStream
+        output: OutputStream,
+        pfd: ParcelFileDescriptor? = null
     ) {
         TransferTracker.startTransfer(filename, "sending", fileSize)
         try {
@@ -605,11 +683,7 @@ class EmbeddedServer(
                 }
 
                 val length = (end - start) + 1
-                if (stream is FileInputStream) {
-                    stream.channel.position(start)
-                } else {
-                    stream.skip(start)
-                }
+                seekStream(stream, pfd, start)
 
                 val headerStr = "HTTP/1.1 206 Partial Content\r\n" +
                         "Content-Type: application/octet-stream\r\n" +
@@ -617,13 +691,15 @@ class EmbeddedServer(
                         "Content-Range: bytes $start-$end/$fileSize\r\n" +
                         "Accept-Ranges: bytes\r\n" +
                         "Access-Control-Allow-Origin: *\r\n" +
+                        "Access-Control-Allow-Headers: Range, Content-Type, Accept\r\n" +
+                        "Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n" +
                         "Connection: close\r\n\r\n"
 
                 output.write(headerStr.toByteArray())
 
                 val buffer = ByteArray(256 * 1024)
                 var remaining = length
-                while (remaining > 0) {
+                while (remaining > 0 && !TransferTracker.isCancelRequested()) {
                     val toRead = if (remaining > buffer.size) buffer.size else remaining.toInt()
                     val read = stream.read(buffer, 0, toRead)
                     if (read == -1) break
@@ -639,6 +715,8 @@ class EmbeddedServer(
                         "Content-Length: $fileSize\r\n" +
                         "Accept-Ranges: bytes\r\n" +
                         "Access-Control-Allow-Origin: *\r\n" +
+                        "Access-Control-Allow-Headers: Range, Content-Type, Accept\r\n" +
+                        "Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n" +
                         "Content-Disposition: attachment; filename=\"${filename}\"; filename*=UTF-8''$encodedName\r\n" +
                         "Connection: close\r\n\r\n"
 
@@ -646,7 +724,7 @@ class EmbeddedServer(
 
                 val buffer = ByteArray(256 * 1024)
                 var read: Int
-                while (stream.read(buffer).also { read = it } != -1) {
+                while (stream.read(buffer).also { read = it } != -1 && !TransferTracker.isCancelRequested()) {
                     output.write(buffer, 0, read)
                     TransferTracker.updateProgress(read.toLong())
                 }

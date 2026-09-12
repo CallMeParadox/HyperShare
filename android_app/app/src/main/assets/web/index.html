@@ -67,6 +67,50 @@
       </div>
     </section>
 
+    <!-- Global 8-Stream Multi-Channel Turbo Visualizer (Active during Turbo transfers) -->
+    <div class="chunk-visualizer" id="chunkContainer" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h4 style="margin: 0;">وضعیت ۸ کانال موازی توربو (8 Parallel Streams):</h4>
+        <span id="turboStatusBadge" style="font-size: 11px; color: var(--paradox-teal); font-weight: 700;">در حال شتاب‌دهی...</span>
+      </div>
+      <div class="chunk-grid" id="chunkGrid"></div>
+    </div>
+
+    <!-- 5GHz High-Speed Optimization Banner & Hotspot Guide -->
+    <div class="speed-booster-banner" id="speedBoosterBanner">
+      <div class="booster-header">
+        <div class="booster-tag">⚡ راهنمای شکستن سد سرعت ۵MB/s (دستیابی به ۸۰+ مگابایت/ثانیه)</div>
+        <button id="btnToggleBoosterGuide" class="btn-booster-toggle" type="button">مشاهده راهنما ▾</button>
+      </div>
+      <div class="booster-content" id="boosterContent" style="display: none;">
+        <div class="booster-desc">
+          اگر سرعت انتقال روی حدود <strong>۵ مگابایت بر ثانیه</strong> متوقف شده، نقطه اتصال (Hotspot) گوشی شما به صورت خودکار روی <strong>باند ۲.۴ گیگاهرتز</strong> کار می‌کند که حداکثر سرعت فیزیکی آن ۵MB/s است. برای پرواز سرعت تا <strong>۸۰+ مگابایت بر ثانیه</strong>:
+        </div>
+        <div class="booster-steps">
+          <div class="booster-step">
+            <span class="step-num">۱</span>
+            <span>وارد <strong>تنظیمات نقطه اتصال (Hotspot)</strong> گوشی شوید.</span>
+          </div>
+          <div class="booster-step">
+            <span class="step-num">۲</span>
+            <span>گزینه <strong>«باند فرکانسی» (AP Band)</strong> را از 2.4 GHz به <strong>5 GHz</strong> تغییر دهید.</span>
+          </div>
+          <div class="booster-step">
+            <span class="step-num">۳</span>
+            <span>دوباره لپ‌تاپ یا گوشی را به وای‌فای متصل کنید؛ سرعت به سقف سخت‌افزاری می‌رسد!</span>
+          </div>
+        </div>
+        <div class="booster-actions" style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="btnOpenHotspotSettings" class="btn-primary btn-sm glow-btn" type="button" style="display: none;">
+            ⚙️ باز کردن مستقیم تنظیمات هات‌اسپات گوشی
+          </button>
+          <button id="btnStartNative5G" class="btn-secondary btn-sm" type="button" style="display: none;">
+            🚀 ایجاد خودکار هات‌اسپات ۵ گیگاهرتز
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- SENDER CONTAINER -->
     <div id="senderContainer">
       <!-- Sender Direct Wi-Fi Connection Banner -->
@@ -157,12 +201,6 @@
             <button id="btnStartTurbo" class="btn-primary turbo-btn" disabled>
               🚀 شلیک توربو (دانلود با ۸ استریم موازی)
             </button>
-          </div>
-
-          <!-- Multi-chunk Visualizer -->
-          <div class="chunk-visualizer" id="chunkContainer" style="display: none;">
-            <h4>وضعیت کانال‌های موازی (8 Parallel Sockets):</h4>
-            <div class="chunk-grid" id="chunkGrid"></div>
           </div>
         </div>
       </section>

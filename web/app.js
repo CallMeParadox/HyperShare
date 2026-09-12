@@ -358,9 +358,37 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   btnDisconnectSender?.addEventListener('click', () => {
+    // 1. Abort any active Turbo transfers
+    if (activeTurboAbortControllers && activeTurboAbortControllers.length > 0) {
+      activeTurboAbortControllers.forEach(c => {
+        try { c.abort(); } catch(e) {}
+      });
+      activeTurboAbortControllers = [];
+    }
+    if (speedInterval) {
+      clearInterval(speedInterval);
+      speedInterval = null;
+    }
+
+    // 2. Notify remote sender to terminate its transfer tracking and reset speed immediately
+    if (currentSenderHost) {
+      fetch(`${currentSenderHost}/api/disconnect`, { method: 'POST', mode: 'cors' }).catch(() => {});
+    }
+    // Also notify local server
+    fetch('/api/disconnect', { method: 'POST' }).catch(() => {});
+
     stopReceiverSync();
     currentSenderHost = '';
     lastReceiverFilesHash = '';
+    window.isManualSpeedActive = false;
+
+    if (chunkContainer) chunkContainer.style.display = 'none';
+    if (currentSpeed) currentSpeed.textContent = '0.0';
+    if (transferFileName) transferFileName.textContent = '⚡ آماده به کار (شبکه آماده انتقال فوق‌سریع)';
+    if (transferPercent) transferPercent.textContent = '';
+    if (progressBarBg) progressBarBg.style.display = 'none';
+    if (transferStats) transferStats.style.display = 'none';
+
     if (receiverConnectedBar) receiverConnectedBar.style.display = 'none';
     if (receiverConnActions) receiverConnActions.style.display = 'block';
     if (receiverStatusTitle) receiverStatusTitle.textContent = 'اتصال قطع شد';
@@ -449,14 +477,17 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="file-badge">${file.category}</span>
             </div>
           </div>
-          <div class="file-actions" style="display: flex; gap: 6px; align-items: center;">
+          <div class="file-actions" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
             ${canPreview ? `
               <button class="btn-secondary btn-sm preview-btn" data-url="${previewUrl}" data-type="${file.category}" data-title="${escapeHtml(file.name)}" title="پیش‌نمایش">
                 👁️
               </button>
             ` : ''}
-            <a href="${downloadUrl}" download="${escapeHtml(file.name)}" class="btn-primary btn-sm glow-btn dl-trigger-btn" data-name="${escapeHtml(file.name)}" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-              ⬇️ دریافت
+            <button class="btn-turbo-card dl-turbo-btn" data-name="${escapeHtml(file.name)}" data-size="${file.size}" title="دانلود فوق‌سریع موازی">
+              🚀 توربو (۸ استریم)
+            </button>
+            <a href="${downloadUrl}" download="${escapeHtml(file.name)}" class="btn-secondary btn-sm dl-trigger-btn" data-name="${escapeHtml(file.name)}" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="دریافت عادی">
+              ⬇️ عادی
             </a>
           </div>
         </div>
@@ -471,12 +502,21 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // Wire immediate feedback on download click
+    // Wire Turbo 8-stream parallel download directly from cards
+    receiverFileList.querySelectorAll('.dl-turbo-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const name = e.currentTarget.dataset.name;
+        const size = parseInt(e.currentTarget.dataset.size, 10) || 0;
+        runTurboPipeline(name, size);
+      });
+    });
+
+    // Wire immediate feedback on standard download click
     receiverFileList.querySelectorAll('.dl-trigger-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const name = e.currentTarget.dataset.name;
         if (transferFileName) {
-          transferFileName.innerHTML = `📥 <strong>در حال آغاز دریافت:</strong> ${escapeHtml(name)}...`;
+          transferFileName.innerHTML = `📥 <strong>در حال دریافت عادی:</strong> ${escapeHtml(name)}...`;
         }
         if (progressBarBg) progressBarBg.style.display = 'block';
         if (progressBar) progressBar.style.width = '3%';
@@ -791,23 +831,41 @@ document.addEventListener('DOMContentLoaded', () => {
   // ----------------------------------------------------
   // Turbo Multi-Stream Parallel Downloader (8 Streams)
   // ----------------------------------------------------
-  btnStartTurbo?.addEventListener('click', async () => {
-    const selectedOption = turboFileSelect.selectedOptions[0];
-    if (!selectedOption) return;
+  let activeTurboAbortControllers = [];
+
+  async function runTurboPipeline(filename, totalSize) {
+    if (!filename) return;
+    totalSize = parseInt(totalSize, 10) || 0;
+
+    // Abort any ongoing turbo transfer
+    if (activeTurboAbortControllers.length > 0) {
+      activeTurboAbortControllers.forEach(c => { try { c.abort(); } catch(e) {} });
+      activeTurboAbortControllers = [];
+    }
 
     window.isManualSpeedActive = true;
+    if (btnStartTurbo) btnStartTurbo.disabled = true;
 
-    const filename = selectedOption.value;
-    const totalSize = parseInt(selectedOption.dataset.size, 10);
-    const numChunks = 8;
-    const chunkSize = Math.ceil(totalSize / numChunks);
+    const baseHost = (activeRole === 'receiver' && currentSenderHost) ? currentSenderHost : '';
 
-    chunkContainer.style.display = 'block';
-    chunkGrid.innerHTML = '';
-    btnStartTurbo.disabled = true;
-    transferFileName.textContent = `توربو: ${filename}`;
+    // If size not known, probe via HEAD
+    if (totalSize <= 0) {
+      try {
+        const headRes = await fetch(`${baseHost}/api/download/${encodeURIComponent(filename)}`, { method: 'HEAD' });
+        const cl = headRes.headers.get('content-length');
+        if (cl) totalSize = parseInt(cl, 10);
+      } catch (e) {}
+    }
 
-    const chunkProgress = new Array(numChunks).fill(0);
+    // Determine streams count (8 streams for files >= 4MB, 4 streams for smaller)
+    const numChunks = (totalSize > 0 && totalSize < 4 * 1024 * 1024) ? 4 : 8;
+    const chunkSize = totalSize > 0 ? Math.ceil(totalSize / numChunks) : 0;
+
+    if (chunkContainer) chunkContainer.style.display = 'block';
+    if (chunkGrid) chunkGrid.innerHTML = '';
+    if (transferFileName) transferFileName.innerHTML = `🚀 <strong>توربو (${numChunks} کاناله):</strong> ${escapeHtml(filename)}`;
+    if (progressBarBg) progressBarBg.style.display = 'block';
+    if (transferStats) transferStats.style.display = 'flex';
 
     // Build visual chunk progress bars
     for (let i = 0; i < numChunks; i++) {
@@ -830,38 +888,61 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastDownloaded = 0;
     let lastTime = startTime;
 
+    if (speedInterval) clearInterval(speedInterval);
     speedInterval = setInterval(() => {
       const now = performance.now();
       const timeDiff = (now - lastTime) / 1000;
       const bytesDiff = totalDownloaded - lastDownloaded;
-      const mbps = (bytesDiff / (1024 * 1024)) / timeDiff;
+      const mbps = timeDiff > 0 ? (bytesDiff / (1024 * 1024)) / timeDiff : 0;
 
-      currentSpeed.textContent = mbps.toFixed(1);
+      if (currentSpeed) currentSpeed.textContent = mbps.toFixed(1);
       lastDownloaded = totalDownloaded;
       lastTime = now;
 
-      const percent = Math.min(100, Math.round((totalDownloaded / totalSize) * 100));
-      transferPercent.textContent = `${percent}%`;
-      progressBar.style.width = `${percent}%`;
-      transferredBytes.textContent = `${(totalDownloaded / (1024*1024)).toFixed(1)} MB / ${(totalSize / (1024*1024)).toFixed(1)} MB`;
+      if (totalSize > 0) {
+        const percent = Math.min(100, Math.round((totalDownloaded / totalSize) * 100));
+        if (transferPercent) transferPercent.textContent = `${percent}%`;
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (transferredBytes) transferredBytes.textContent = `${(totalDownloaded / (1024*1024)).toFixed(1)} MB / ${(totalSize / (1024*1024)).toFixed(1)} MB`;
 
-      if (mbps > 0) {
-        const remainingBytes = totalSize - totalDownloaded;
-        const etaSec = remainingBytes / (mbps * 1024 * 1024);
-        etaTime.textContent = `ETA: ${Math.round(etaSec)} ثانیه`;
+        if (mbps > 0) {
+          const remainingBytes = Math.max(0, totalSize - totalDownloaded);
+          const etaSec = remainingBytes / (mbps * 1024 * 1024);
+          if (etaTime) etaTime.textContent = `ETA: ${Math.round(etaSec)} ثانیه`;
+        }
+      } else {
+        if (transferredBytes) transferredBytes.textContent = `${(totalDownloaded / (1024*1024)).toFixed(1)} MB`;
       }
-    }, 400);
+    }, 350);
 
-    const baseHost = (activeRole === 'receiver' && currentSenderHost) ? currentSenderHost : '';
     const promises = [];
+    activeTurboAbortControllers = [];
+
+    // Fallback single stream if totalSize is unknown or 1 chunk
+    if (totalSize <= 0 || numChunks <= 1) {
+      const downloadUrl = `${baseHost}/api/download/${encodeURIComponent(filename)}`;
+      window.location.href = downloadUrl;
+      clearInterval(speedInterval);
+      window.isManualSpeedActive = false;
+      if (btnStartTurbo) btnStartTurbo.disabled = false;
+      return;
+    }
+
     for (let i = 0; i < numChunks; i++) {
       const start = i * chunkSize;
       const end = Math.min((i + 1) * chunkSize - 1, totalSize - 1);
+      const controller = new AbortController();
+      activeTurboAbortControllers.push(controller);
 
       promises.push((async () => {
         const res = await fetch(`${baseHost}/api/download/${encodeURIComponent(filename)}`, {
-          headers: { 'Range': `bytes=${start}-${end}` }
+          headers: { 'Range': `bytes=${start}-${end}` },
+          signal: controller.signal
         });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
 
         const reader = res.body.getReader();
         const parts = [];
@@ -875,9 +956,11 @@ document.addEventListener('DOMContentLoaded', () => {
           chunkRecv += value.length;
           totalDownloaded += value.length;
 
-          const p = Math.round((chunkRecv / expected) * 100);
-          document.getElementById(`chunkBar-${i}`).style.width = `${p}%`;
-          document.getElementById(`chunkText-${i}`).textContent = `${p}%`;
+          const p = Math.min(100, Math.round((chunkRecv / expected) * 100));
+          const barEl = document.getElementById(`chunkBar-${i}`);
+          const txtEl = document.getElementById(`chunkText-${i}`);
+          if (barEl) barEl.style.width = `${p}%`;
+          if (txtEl) txtEl.textContent = `${p}%`;
         }
 
         return new Blob(parts);
@@ -887,16 +970,17 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const blobs = await Promise.all(promises);
       clearInterval(speedInterval);
-      currentSpeed.textContent = '0.0';
-      progressBar.style.width = '100%';
-      transferPercent.textContent = '100% (تکمیل)';
-      etaTime.textContent = 'انجام شد!';
+      speedInterval = null;
+      if (currentSpeed) currentSpeed.textContent = '0.0';
+      if (progressBar) progressBar.style.width = '100%';
+      if (transferPercent) transferPercent.textContent = '۱۰۰% (تکمیل شد)';
+      if (etaTime) etaTime.textContent = 'انجام شد!';
 
       if (window.AndroidBridge && window.AndroidBridge.vibrate) {
         window.AndroidBridge.vibrate(200);
       }
 
-      const finalBlob = new Blob(blobs);
+      const finalBlob = new Blob(blobs, { type: 'application/octet-stream' });
       const url = URL.createObjectURL(finalBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -904,15 +988,95 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+      setTimeout(() => {
+        if (!window.isManualSpeedActive && chunkContainer) {
+          chunkContainer.style.display = 'none';
+        }
+      }, 3500);
     } catch (err) {
       clearInterval(speedInterval);
-      alert(`خطا در دانلود توربو: ${err.message}`);
+      speedInterval = null;
+      if (err.name === 'AbortError') {
+        console.log('Turbo download cancelled by user');
+        return;
+      }
+      console.error('Turbo error, falling back to standard download:', err);
+      alert(`هشدار توربو: ${err.message}\nدر حال دریافت فایل با روش استاندارد...`);
+      window.location.href = `${baseHost}/api/download/${encodeURIComponent(filename)}`;
     } finally {
       window.isManualSpeedActive = false;
-      btnStartTurbo.disabled = false;
+      if (btnStartTurbo) btnStartTurbo.disabled = false;
+      activeTurboAbortControllers = [];
     }
+  }
+
+  btnStartTurbo?.addEventListener('click', async () => {
+    const selectedOption = turboFileSelect.selectedOptions[0];
+    if (!selectedOption || !selectedOption.value) {
+      alert('لطفاً ابتدا یک فایل را از لیست انتخاب کنید.');
+      return;
+    }
+    const filename = selectedOption.value;
+    const totalSize = parseInt(selectedOption.dataset.size, 10) || 0;
+    runTurboPipeline(filename, totalSize);
   });
+
+  // ----------------------------------------------------
+  // 5GHz Speed Booster Banner & Hotspot Guide Bindings
+  // ----------------------------------------------------
+  const btnToggleBoosterGuide = document.getElementById('btnToggleBoosterGuide');
+  const boosterContent = document.getElementById('boosterContent');
+  const btnOpenHotspotSettings = document.getElementById('btnOpenHotspotSettings');
+  const btnStartNative5G = document.getElementById('btnStartNative5G');
+
+  btnToggleBoosterGuide?.addEventListener('click', () => {
+    if (!boosterContent) return;
+    const isHidden = boosterContent.style.display === 'none';
+    boosterContent.style.display = isHidden ? 'block' : 'none';
+    btnToggleBoosterGuide.textContent = isHidden ? 'بستن راهنما ▴' : 'مشاهده راهنما ▾';
+  });
+
+  if (window.AndroidBridge) {
+    if (btnOpenHotspotSettings) {
+      btnOpenHotspotSettings.style.display = 'inline-flex';
+      btnOpenHotspotSettings.addEventListener('click', () => {
+        if (window.AndroidBridge.openHotspotSettings) {
+          window.AndroidBridge.openHotspotSettings();
+        }
+      });
+    }
+
+    if (btnStartNative5G) {
+      btnStartNative5G.style.display = 'inline-flex';
+      btnStartNative5G.addEventListener('click', () => {
+        if (window.AndroidBridge.startNative5GHzHotspot) {
+          window.AndroidBridge.startNative5GHzHotspot();
+        }
+      });
+    }
+
+    // Check actual Wi-Fi frequency
+    try {
+      if (window.AndroidBridge.getWifiFrequency) {
+        const freq = window.AndroidBridge.getWifiFrequency();
+        if (freq >= 4900) {
+          if (networkStatus) networkStatus.textContent = '5GHz P2P (نهایت سرعت)';
+        } else if (freq >= 2400 && freq <= 2500) {
+          if (networkStatus) {
+            networkStatus.textContent = '2.4GHz (محدود به ۵MB/s)';
+            networkStatus.style.color = 'var(--paradox-yellow)';
+          }
+          // Automatically expand speed guide to alert user about 2.4GHz bottleneck!
+          if (boosterContent) {
+            boosterContent.style.display = 'block';
+            if (btnToggleBoosterGuide) btnToggleBoosterGuide.textContent = 'بستن راهنما ▴';
+          }
+        }
+      }
+    } catch (e) {}
+  }
 
   // ----------------------------------------------------
   // 5GHz Speed Test Benchmark
