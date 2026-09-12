@@ -27,16 +27,13 @@ android {
             storePassword System.getenv("KEYSTORE_PASSWORD") ?: "hypershare2026"
             keyAlias System.getenv("KEY_ALIAS") ?: "hypershare"
             keyPassword System.getenv("KEY_PASSWORD") ?: "hypershare2026"
-            v1SigningEnabled true
-            v2SigningEnabled true
-            v3SigningEnabled true
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }

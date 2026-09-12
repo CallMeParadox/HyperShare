@@ -25,16 +25,10 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Setup Gradle
+    - name: Setup Gradle 8.6
       uses: gradle/actions/setup-gradle@v4
-
-    - name: Generate Gradle Wrapper if missing
-      working-directory: android_app
-      run: |
-        if [ ! -f "gradlew" ]; then
-          gradle wrapper --gradle-version 8.6
-        fi
-        chmod +x gradlew
+      with:
+        gradle-version: '8.6'
 
     - name: Build Android App Bundle (AAB for Google Play Store)
       working-directory: android_app
@@ -42,7 +36,7 @@ jobs:
         KEYSTORE_PASSWORD: "hypershare2026"
         KEY_ALIAS: "hypershare"
         KEY_PASSWORD: "hypershare2026"
-      run: ./gradlew bundleRelease --stacktrace
+      run: gradle bundleRelease --stacktrace
 
     - name: Build Universal Signed APK (For Direct Phone Testing)
       working-directory: android_app
@@ -50,7 +44,7 @@ jobs:
         KEYSTORE_PASSWORD: "hypershare2026"
         KEY_ALIAS: "hypershare"
         KEY_PASSWORD: "hypershare2026"
-      run: ./gradlew assembleRelease --stacktrace
+      run: gradle assembleRelease --stacktrace
 
     - name: Upload Google Play Store Bundle (.aab)
       uses: actions/upload-artifact@v4
