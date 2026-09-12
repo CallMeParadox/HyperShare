@@ -17,6 +17,7 @@ class HyperShareService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var embeddedServer: EmbeddedServer? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -37,6 +38,10 @@ class HyperShareService : Service() {
             "HyperShare::WifiLock"
         )
         wifiLock?.acquire()
+
+        // Ensure server stays running in foreground
+        embeddedServer = EmbeddedServer(applicationContext, 8080)
+        embeddedServer?.start()
 
         startForeground(NOTIFICATION_ID, buildNotification("HyperShare فعال است", "آماده انتقال پرسرعت ۵ گیگاهرتز"))
     }
@@ -77,6 +82,7 @@ class HyperShareService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        embeddedServer?.stop()
         wifiLock?.let { if (it.isHeld) it.release() }
         wakeLock?.let { if (it.isHeld) it.release() }
     }

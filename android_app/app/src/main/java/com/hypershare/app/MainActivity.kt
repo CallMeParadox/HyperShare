@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -22,8 +24,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var loadingSpinner: ProgressBar
     private lateinit var hotspotManager: LocalOnlyHotspotManager
+    private lateinit var embeddedServer: EmbeddedServer
 
-    // Register modern permission request callback
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -44,8 +48,18 @@ class MainActivity : AppCompatActivity() {
         loadingSpinner = findViewById(R.id.loadingSpinner)
         hotspotManager = LocalOnlyHotspotManager(this)
 
-        checkAndRequestPermissions()
+        // 1. Start the embedded high-speed server locally on port 8080
+        embeddedServer = EmbeddedServer(applicationContext, 8080)
+        embeddedServer.start()
+
+        // 2. Setup WebView and permissions
         setupWebView()
+        checkAndRequestPermissions()
+
+        // 3. Load UI from local embedded server (after 200ms warm-up)
+        mainHandler.postDelayed({
+            webView.loadUrl("http://127.0.0.1:8080")
+        }, 200)
     }
 
     private fun checkAndRequestPermissions() {
@@ -83,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
-        settings.allowFileAccess = false
+        settings.allowFileAccess = true
         settings.allowContentAccess = true
         settings.cacheMode = WebSettings.LOAD_DEFAULT
 
@@ -99,20 +113,19 @@ class MainActivity : AppCompatActivity() {
 
         webView.webViewClient = object : WebViewClient() {
             override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
-                // If local engine is starting up, retry in 1 second
-                view?.postDelayed({ view.reload() }, 1000)
+                // If local server is still starting up, retry in 500ms
+                mainHandler.postDelayed({
+                    view?.loadUrl("http://127.0.0.1:8080")
+                }, 500)
             }
         }
-
-        // Load HyperShare Web Portal
-        webView.loadUrl("http://127.0.0.1:8080")
     }
 
     fun start5GHzHotspot() {
         hotspotManager.startHotspot(object : LocalOnlyHotspotManager.HotspotListener {
             override fun onHotspotStarted(ssid: String, passphrase: String?, is5GHz: Boolean) {
                 runOnUiThread {
-                    Toast.makeText(this@MainActivity, "هات‌اسپات ۵ گیگاهرتز روشن شد: $ssid", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "هات‌اسپات فعال شد: $ssid", Toast.LENGTH_LONG).show()
                     val js = "javascript:if(window.onHotspotStarted) window.onHotspotStarted('$ssid', '$passphrase', $is5GHz);"
                     webView.evaluateJavascript(js, null)
                 }
@@ -146,6 +159,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        embeddedServer.stop()
         hotspotManager.stopHotspot()
     }
 }
