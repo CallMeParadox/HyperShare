@@ -35,10 +35,19 @@ class LocalOnlyHotspotManager(private val context: Context) {
                     override fun onStarted(res: WifiManager.LocalOnlyHotspotReservation) {
                         reservation = res
                         
-                        @Suppress("DEPRECATION")
-                        val config = res.wifiConfiguration
-                        val ssid = config?.SSID ?: "HyperShare_P2P"
-                        val passphrase = config?.preSharedKey
+                        val ssid: String
+                        val passphrase: String?
+
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                            val softApConfig = res.softApConfiguration
+                            ssid = softApConfig?.ssid ?: (res.wifiConfiguration?.SSID ?: "HyperShare_P2P")
+                            passphrase = softApConfig?.passphrase ?: res.wifiConfiguration?.preSharedKey
+                        } else {
+                            @Suppress("DEPRECATION")
+                            val config = res.wifiConfiguration
+                            ssid = config?.SSID ?: "HyperShare_P2P"
+                            passphrase = config?.preSharedKey
+                        }
 
                         Log.i(TAG, "Local Hotspot started successfully: SSID=$ssid, 5GHz=$is5GHzSupported")
                         listener.onHotspotStarted(ssid, passphrase, is5GHzSupported)

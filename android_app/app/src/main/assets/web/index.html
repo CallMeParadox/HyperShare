@@ -121,6 +121,7 @@
             <code id="senderBannerUrl" class="sender-url-code">در حال دریافت آدرس شبکه...</code>
             <button id="btnCopySenderUrl" class="btn-secondary btn-sm" type="button" title="کپی کردن آدرس">📋 کپی</button>
             <button id="btnBannerShowQR" class="btn-primary btn-sm glow-btn" type="button" title="نمایش بارکد QR">📱 بارکد اتصال</button>
+            <button id="btnAutoStartHotspot" class="btn-primary btn-sm glow-btn" type="button" style="display: none; background: linear-gradient(135deg, var(--paradox-teal), #06d6a0); border-color: transparent;" title="ایجاد خودکار هات‌اسپات پرسرعت بدون نیاز به تنظیمات">⚡ وای‌فای خودکار (مشابه زاپیا)</button>
           </div>
         </div>
       </div>
@@ -463,6 +464,10 @@
         <div class="qr-tabs">
           <button class="qr-tab-btn active" id="qrTabUrl">لینک دانلود مستقیم</button>
           <button class="qr-tab-btn" id="qrTabWifi">وای‌فای ۵ گیگاهرتز</button>
+        </div>
+        <div id="hotspotDetailsBox" style="display: none; margin-top: 14px; font-size: 13px; background: rgba(0,0,0,0.25); padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); text-align: right;">
+          <div style="margin-bottom: 6px;">📡 <strong>نام شبکه وای‌فای (SSID):</strong> <code id="hotspotSsidVal" style="color: var(--paradox-teal); font-weight: bold; user-select: all;"></code></div>
+          <div>🔑 <strong>رمز عبور وای‌فای:</strong> <code id="hotspotPassVal" style="color: var(--paradox-yellow); font-weight: bold; user-select: all;"></code></div>
         </div>
       </div>
     </div>

@@ -50,6 +50,9 @@ class EmbeddedServer(
     // Clipboard storage
     private val clipboardItems = CopyOnWriteArrayList<String>()
 
+    // Live Wi-Fi credentials for QR code
+    @Volatile var activeWifiConfig: String = "WIFI:T:WPA;S:HyperShare_5G;P:hyper1234;;"
+
     fun addSharedItems(items: List<SharedItem>) {
         for (newItem in items) {
             memorySharedItems.removeAll { it.name == newItem.name }
@@ -405,7 +408,7 @@ class EmbeddedServer(
                 path == "/api/qr/url" || path == "/api/qr/wifi" -> {
                     val ip = getLocalIpAddress()
                     val content = if (path.contains("wifi")) {
-                        "WIFI:T:WPA;S:HyperShare_5G;P:hyper1234;;"
+                        activeWifiConfig
                     } else {
                         "http://$ip:$port"
                     }

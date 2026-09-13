@@ -366,6 +366,7 @@ class MainActivity : AppCompatActivity() {
     fun start5GHzHotspot() {
         hotspotManager.startHotspot(object : LocalOnlyHotspotManager.HotspotListener {
             override fun onHotspotStarted(ssid: String, passphrase: String?, is5GHz: Boolean) {
+                embeddedServer.activeWifiConfig = "WIFI:T:WPA;S:$ssid;P:${passphrase ?: ""};;"
                 runOnUiThread {
                     Toast.makeText(this@MainActivity, "هات‌اسپات فعال شد: $ssid", Toast.LENGTH_LONG).show()
                     val js = "javascript:if(window.onHotspotStarted) window.onHotspotStarted('$ssid', '$passphrase', $is5GHz);"

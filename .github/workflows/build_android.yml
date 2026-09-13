@@ -71,15 +71,18 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
-        tag_name: v1.1.2
-        name: "HyperShare v1.1.2 (Multi-Stream Range Fix, Synchronized Disconnect & 5GHz AP Band Guide)"
+        tag_name: v1.1.3
+        name: "HyperShare v1.1.3 (Zapya-Style Auto 5GHz Hotspot, SoftApConfig Fix & Dynamic Wi-Fi QR)"
         body: |
-          ### 🚀 HyperShare v1.1.2 - Parallel Turbo Fix, Disconnect Synchronization & 5GHz Guidance
-          - **Fixed Android Multi-Stream Turbo Seeking (`ESPIPE`)**: Resolved the seek crash on `content://` URIs by implementing native Linux `android.system.Os.lseek` with safe byte-skipping fallback. Parallel 8-stream HTTP Range requests now download smoothly without connection drops.
-          - **Turbo Parallel Download on Every Receiver Card**: Users can now launch 8-stream parallel downloads directly from any file card in the Receiver view, featuring live animated progress bars for each parallel socket.
-          - **Synchronized Disconnect & Instant Speed Reset**: Added `/api/disconnect` and `/api/cancel-transfer` endpoints on both Android and PC backends. When a user clicks "قطع اتصال" on PC, the Mobile sender immediately aborts transfers and resets its speedometer to 0.0 MB/s (`⚡ آماده به کار`).
-          - **5GHz Hotspot Optimization & Step-by-Step Guide**: Added an interactive speed booster guide explaining how to switch the phone's Mobile Hotspot from 2.4 GHz (capped at ~5 MB/s) to 5 GHz (reaching 40-90+ MB/s), with a 1-tap shortcut to Android Hotspot Settings.
-          - **CORS Range Headers**: Added `Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges` and preflight headers.
+          ### 🚀 HyperShare v1.1.3 - Zapya-Style Automatic 5GHz Hotspot & Live Wi-Fi QR
+          - **⚡ Automatic 5GHz Local-Only Hotspot (Zapya / SHAREit Style)**: 
+            No more manual hotspot configuration or missing 5GHz frequency band settings on Xiaomi/Redmi HyperOS! HyperShare can now automatically spin up a dedicated 5GHz 80MHz Wi-Fi Hotspot using Android's native `WifiManager.startLocalOnlyHotspot()`.
+          - **🔑 Android 11+ SoftApConfiguration Support**:
+            Resolved an issue where Android 11, 12, 13, and 14 returned `null` for legacy `res.wifiConfiguration`. HyperShare now queries `res.softApConfiguration` to extract the OS-generated SSID and WPA2 passphrase dynamically.
+          - **📷 Dynamic Scannable Wi-Fi QR Code**:
+            When the auto-hotspot launches, HyperShare automatically opens the QR modal to the Wi-Fi QR tab and displays the exact SSID and password for seamless 1-scan connection from Windows PC, iPhone, or another Android phone.
+          - **🛡️ Google Play Compliant Permissions**:
+            Added backward-compatible location permissions for Android 10-12 (`maxSdkVersion="32"`) while strictly maintaining Android 13+ modern Wi-Fi permissions (`NEARBY_WIFI_DEVICES` with `neverForLocation`).
           
           ### 📦 Download Assets:
           - **HyperShare_PC.exe**: Windows Desktop App (Double-click to run native window)

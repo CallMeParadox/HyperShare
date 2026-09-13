@@ -1055,6 +1055,20 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    const btnAutoStartHotspot = document.getElementById('btnAutoStartHotspot');
+    const hotspotDetailsBox = document.getElementById('hotspotDetailsBox');
+    const hotspotSsidVal = document.getElementById('hotspotSsidVal');
+    const hotspotPassVal = document.getElementById('hotspotPassVal');
+
+    if (btnAutoStartHotspot) {
+      btnAutoStartHotspot.style.display = 'inline-flex';
+      btnAutoStartHotspot.addEventListener('click', () => {
+        if (window.AndroidBridge.startNative5GHzHotspot) {
+          window.AndroidBridge.startNative5GHzHotspot();
+        }
+      });
+    }
+
     if (btnStartNative5G) {
       btnStartNative5G.style.display = 'inline-flex';
       btnStartNative5G.addEventListener('click', () => {
@@ -1069,7 +1083,21 @@ document.addEventListener('DOMContentLoaded', () => {
         networkStatus.textContent = is5GHz ? '5GHz Hotspot (فعال)' : 'Hotspot P2P (فعال)';
         networkStatus.style.color = 'var(--paradox-green)';
       }
-      alert(`✅ هات‌اسپات پرسرعت هایپرشیر فعال شد!\n\nنام وای‌فای: ${ssid}\nرمز عبور: ${passphrase || 'بدون رمز'}\n\nاکنون کامپیوتر یا دستگاه دوم را به این وای‌فای متصل کنید.`);
+      if (hotspotDetailsBox) hotspotDetailsBox.style.display = 'block';
+      if (hotspotSsidVal) hotspotSsidVal.textContent = ssid;
+      if (hotspotPassVal) hotspotPassVal.textContent = passphrase || '(بدون رمز)';
+
+      const qm = document.getElementById('qrModal');
+      const qrImg = document.getElementById('qrImage');
+      const qrTabWifi = document.getElementById('qrTabWifi');
+      const qrTabUrl = document.getElementById('qrTabUrl');
+      if (qm) {
+        qm.style.display = 'flex';
+        qm.classList.add('open');
+        if (qrImg) qrImg.src = `/api/qr/wifi?t=${Date.now()}`;
+        if (qrTabWifi) qrTabWifi.classList.add('active');
+        if (qrTabUrl) qrTabUrl.classList.remove('active');
+      }
     };
 
     // Check actual Wi-Fi frequency
