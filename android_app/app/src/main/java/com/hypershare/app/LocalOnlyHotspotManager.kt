@@ -38,16 +38,21 @@ class LocalOnlyHotspotManager(private val context: Context) {
                         val ssid: String
                         val passphrase: String?
 
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                            val softApConfig = res.softApConfiguration
-                            ssid = softApConfig?.ssid ?: (res.wifiConfiguration?.SSID ?: "HyperShare_P2P")
-                            passphrase = softApConfig?.passphrase ?: res.wifiConfiguration?.preSharedKey
+                        val rawSsid = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                            res.softApConfiguration?.ssid ?: res.wifiConfiguration?.SSID ?: "HyperShare_P2P"
                         } else {
                             @Suppress("DEPRECATION")
-                            val config = res.wifiConfiguration
-                            ssid = config?.SSID ?: "HyperShare_P2P"
-                            passphrase = config?.preSharedKey
+                            res.wifiConfiguration?.SSID ?: "HyperShare_P2P"
                         }
+                        ssid = rawSsid.removeSurrounding("\"")
+
+                        val rawPassphrase = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                            res.softApConfiguration?.passphrase ?: res.wifiConfiguration?.preSharedKey
+                        } else {
+                            @Suppress("DEPRECATION")
+                            res.wifiConfiguration?.preSharedKey
+                        }
+                        passphrase = rawPassphrase?.removeSurrounding("\"")
 
                         Log.i(TAG, "Local Hotspot started successfully: SSID=$ssid, 5GHz=$is5GHzSupported")
                         listener.onHotspotStarted(ssid, passphrase, is5GHzSupported)

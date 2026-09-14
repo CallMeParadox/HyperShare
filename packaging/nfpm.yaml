@@ -1,0 +1,32 @@
+﻿name: "hypershare"
+arch: "${ARCH}"
+platform: "linux"
+version: "1.1.3"
+section: "net"
+priority: "optional"
+maintainer: "CallMeParadox <https://github.com/CallMeParadox>"
+description: "Ultra-fast 5GHz offline P2P file sharing system"
+homepage: "https://github.com/CallMeParadox/HyperShare"
+license: "MIT"
+contents:
+  - src: ./hypershare
+    dst: /usr/bin/hypershare
+    file_info:
+      mode: 0755
+  - src: ./packaging/linux/hypershare.desktop
+    dst: /usr/share/applications/hypershare.desktop
+  - src: ./packaging/icons/hypershare.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/hypershare.svg
+  - src: ./packaging/icons/hypershare.png
+    dst: /usr/share/icons/hicolor/512x512/apps/hypershare.png
+  - src: ./packaging/linux/hypershare.service
+    dst: /usr/lib/systemd/user/hypershare.service
+deb:
+  suggests:
+    - zenity
+    - xdg-utils
+rpm:
+  group: Applications/Internet
+  suggests:
+    - zenity
+    - xdg-utils

@@ -63,36 +63,80 @@ jobs:
       with:
         go-version: '1.22'
 
-    - name: Build Windows PC Executable (HyperShare_PC.exe)
+    - name: Build Multi-Distribution Binaries & Packages (Linux, macOS, Windows)
       run: |
-        GOOS=windows GOARCH=amd64 go build -ldflags="-H=windowsgui -s -w" -o HyperShare_PC.exe main.go
+        mkdir -p dist
+        
+        # Install nfpm for building .deb and .rpm packages
+        go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+        
+        # 1. Build Windows AMD64 & ARM64
+        GOOS=windows GOARCH=amd64 go build -ldflags="-H=windowsgui -s -w" -o dist/HyperShare_PC.exe .
+        zip -j dist/HyperShare-Windows-x86_64.zip dist/HyperShare_PC.exe Run_HyperShare.bat
+        
+        GOOS=windows GOARCH=arm64 go build -ldflags="-H=windowsgui -s -w" -o dist/HyperShare_PC_arm64.exe .
+        zip -j dist/HyperShare-Windows-arm64.zip dist/HyperShare_PC_arm64.exe Run_HyperShare.bat
 
-    - name: Create GitHub Release with APK, AAB & PC App
+        # 2. Build Linux AMD64 (.tar.gz, .deb, .rpm)
+        GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o hypershare .
+        tar -czvf dist/hypershare-linux-amd64.tar.gz hypershare packaging/linux/install.sh packaging/linux/hypershare.desktop packaging/linux/hypershare.service packaging/icons/hypershare.svg
+        ARCH=amd64 nfpm pkg -f packaging/nfpm.yaml --packager deb --target dist/
+        ARCH=x86_64 nfpm pkg -f packaging/nfpm.yaml --packager rpm --target dist/
+        rm -f hypershare
+
+        # 3. Build Linux ARM64 (.tar.gz, .deb, .rpm)
+        GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o hypershare .
+        tar -czvf dist/hypershare-linux-arm64.tar.gz hypershare packaging/linux/install.sh packaging/linux/hypershare.desktop packaging/linux/hypershare.service packaging/icons/hypershare.svg
+        ARCH=arm64 nfpm pkg -f packaging/nfpm.yaml --packager deb --target dist/
+        ARCH=aarch64 nfpm pkg -f packaging/nfpm.yaml --packager rpm --target dist/
+        rm -f hypershare
+
+        # 4. Build macOS Darwin AMD64 (Intel) & ARM64 (Apple Silicon)
+        GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o hypershare .
+        tar -czvf dist/hypershare-darwin-amd64.tar.gz hypershare
+        rm -f hypershare
+
+        GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o hypershare .
+        tar -czvf dist/hypershare-darwin-arm64.tar.gz hypershare
+        rm -f hypershare
+
+        # 5. Generate Checksums
+        cd dist && sha256sum * > SHA256SUMS
+
+    - name: Create GitHub Release with Multi-Distribution Packages
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       with:
         tag_name: v1.1.3
-        name: "HyperShare v1.1.3 (Zapya-Style Auto 5GHz Hotspot, SoftApConfig Fix & Dynamic Wi-Fi QR)"
+        name: "HyperShare v1.1.3 (Multi-Distribution Release: Linux, macOS, Windows & Android)"
         body: |
-          ### 🚀 HyperShare v1.1.3 - Zapya-Style Automatic 5GHz Hotspot & Live Wi-Fi QR
-          - **⚡ Automatic 5GHz Local-Only Hotspot (Zapya / SHAREit Style)**: 
-            No more manual hotspot configuration or missing 5GHz frequency band settings on Xiaomi/Redmi HyperOS! HyperShare can now automatically spin up a dedicated 5GHz 80MHz Wi-Fi Hotspot using Android's native `WifiManager.startLocalOnlyHotspot()`.
-          - **🔑 Android 11+ SoftApConfiguration Support**:
-            Resolved an issue where Android 11, 12, 13, and 14 returned `null` for legacy `res.wifiConfiguration`. HyperShare now queries `res.softApConfiguration` to extract the OS-generated SSID and WPA2 passphrase dynamically.
-          - **📷 Dynamic Scannable Wi-Fi QR Code**:
-            When the auto-hotspot launches, HyperShare automatically opens the QR modal to the Wi-Fi QR tab and displays the exact SSID and password for seamless 1-scan connection from Windows PC, iPhone, or another Android phone.
-          - **🛡️ Google Play Compliant Permissions**:
-            Added backward-compatible location permissions for Android 10-12 (`maxSdkVersion="32"`) while strictly maintaining Android 13+ modern Wi-Fi permissions (`NEARBY_WIFI_DEVICES` with `neverForLocation`).
+          ### 🚀 HyperShare v1.1.3 - Multi-Distribution & Cross-Platform Release
+          This release introduces full multi-distribution support across Linux distributions, macOS, Windows, and Android.
           
-          ### 📦 Download Assets:
-          - **HyperShare_PC.exe**: Windows Desktop App (Double-click to run native window)
-          - **Run_HyperShare.bat**: One-click Windows launcher script
-          - **app-release.apk**: Universal Signed Android APK (Install directly on phone)
+          #### 🐧 Linux Distributions:
+          - **Debian / Ubuntu / Mint / Pop!_OS**: `.deb` packages (AMD64 & ARM64)
+          - **Fedora / RHEL / CentOS / openSUSE**: `.rpm` packages (x86_64 & aarch64)
+          - **Arch Linux / Manjaro**: AUR PKGBUILD available in repository (`packaging/arch/PKGBUILD`)
+          - **Generic / Alpine / Raspberry Pi**: Standalone `.tar.gz` with universal installer (`install.sh`)
+          - **Desktop Integration**: Includes XDG desktop entry (`hypershare.desktop`), systemd user service (`hypershare.service`), and icons.
+          
+          #### 🍎 macOS:
+          - **Apple Silicon (M1/M2/M3/M4)**: `hypershare-darwin-arm64.tar.gz`
+          - **Intel x86_64**: `hypershare-darwin-amd64.tar.gz`
+          
+          #### 🪟 Windows:
+          - **Windows x86_64**: `HyperShare-Windows-x86_64.zip` & standalone `HyperShare_PC.exe`
+          - **Windows ARM64**: `HyperShare-Windows-arm64.zip`
+          
+          #### 📱 Android:
+          - **app-release.apk**: Universal signed APK (Direct phone installation)
           - **app-release.aab**: Google Play Store Bundle
+          
+          #### 🔐 Checksums:
+          - Check `SHA256SUMS` to verify file integrity.
         files: |
+          dist/*
           android_app/app/build/outputs/apk/release/*.apk
           android_app/app/build/outputs/bundle/release/*.aab
-          HyperShare_PC.exe
-          Run_HyperShare.bat
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

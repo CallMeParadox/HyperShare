@@ -54,12 +54,14 @@ func GetNetworkInfo(port int) (*NetworkInfo, error) {
 			ipStr := ip.String()
 			allIPs = append(allIPs, ipStr)
 
-			// Standard Android / iOS hotspot IP subnets:
+			// Standard Android / iOS / Windows hotspot IP subnets:
 			// 192.168.43.x (Android standard SoftAP)
 			// 192.168.49.x (Wi-Fi Direct P2P)
+			// 192.168.137.x (Windows Mobile Hotspot)
 			// 172.20.10.x (iOS Personal Hotspot)
 			if strings.HasPrefix(ipStr, "192.168.43.") ||
 				strings.HasPrefix(ipStr, "192.168.49.") ||
+				strings.HasPrefix(ipStr, "192.168.137.") ||
 				strings.HasPrefix(ipStr, "172.20.10.") {
 				preferredIP = ipStr
 				isHotspot = true
