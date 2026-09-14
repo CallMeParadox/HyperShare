@@ -64,14 +64,84 @@ hypershare/
 
 ## 💻 نحوه اجرا و تست
 
-### اجرای مستقیم روی سیستم:
+### اجرای مستقیم روی سیستم (ویندوز):
 ```powershell
 cd C:\Users\HP\.gemini\antigravity\scratch\hypershare
-.\hypershare.exe -port 8080 -dir ./shared
+.\HyperShare_PC.exe -port 8080 -dir ./shared
 ```
 
 ### کامپایل برای موبایل اندروید (معماری ARM64):
 ```powershell
-$env:GOOS="android"; $env:GOARCH="arm64"; go build -o hypershare_arm64 main.go
+$env:GOOS="android"; $env:GOARCH="arm64"; go build -o hypershare_arm64 .
 ```
-این فایل خروجی مستقیماً درون سورس اندروید (از طریق NDK یا به عنوان سرویس پس‌زمینه) یا داخل شل Termux قابل اجراست.
+این فایل خروجی مستقیماً درون سورس اندروید یا داخل محیط Termux قابل اجراست.
+
+---
+
+## 📦 راهنمای نصب در توزیع‌های مختلف (Multi-Distribution Support)
+
+هایپرشیر اکنون از تمامی توزیع‌های مطرح لینوکس، مک‌او‌اس و ویندوز به صورت بومی پشتیبانی می‌کند:
+
+### 🐧 ۱. توزیع‌های لینوکس بر پایه دبیان و اوبونتو (Debian / Ubuntu / Linux Mint / Pop!_OS)
+بسته نصبی رسمی `.deb` را دانلود و با دستور زیر نصب کنید:
+```bash
+# معماری 64 بیتی اینتل/ای‌ام‌دی:
+sudo dpkg -i hypershare_*_amd64.deb
+sudo apt-get install -f
+
+# معماری ARM64 (رزبری‌پای و پردازنده‌های آرم):
+sudo dpkg -i hypershare_*_arm64.deb
+sudo apt-get install -f
+```
+
+### 🔴 ۲. توزیع‌های مبتنی بر ردهت و فدورا (Fedora / RHEL / CentOS / openSUSE)
+بسته نصبی استاندارد `.rpm` را دانلود کرده و نصب کنید:
+```bash
+# فدورا و RHEL (x86_64):
+sudo rpm -ivh hypershare-*.x86_64.rpm
+# یا با dnf:
+sudo dnf install ./hypershare-*.x86_64.rpm
+
+# معماری aarch64 / ARM64:
+sudo rpm -ivh hypershare-*.aarch64.rpm
+```
+
+### 🏹 ۳. آرچ لینوکس و مانجارو (Arch Linux / Manjaro)
+می‌توانید با استفاده از فایل `PKGBUILD` موجود در پوشه `packaging/arch/` بسته را کامپایل و نصب کنید:
+```bash
+cd packaging/arch
+makepkg -si
+```
+
+### 🌐 ۴. نصب سریع جنریک با اسکریپت تک‌خطی (تمام توزیع‌های لینوکس و آلپاین)
+برای نصب یا به‌روزرسانی سریع بدون وابستگی به مدیر بسته:
+```bash
+curl -sSL https://raw.githubusercontent.com/CallMeParadox/HyperShare/main/packaging/linux/install.sh | bash
+```
+> برای حذف برنامه کافی است دستور `install.sh uninstall` را اجرا کنید.
+
+### ⚙️ اجرای خودکار به عنوان سرویس پس‌زمینه (Systemd User Service)
+برای اجرای دائمی هایپرشیر به عنوان سرور اشتراک‌گذاری در پس‌زمینه:
+```bash
+systemctl --user enable --now hypershare
+```
+
+### 🍎 ۵. سیستم‌عامل مک (macOS - Intel & Apple Silicon)
+فایل فشرده مناسب پردازنده مک خود را دریافت و استخراج کنید:
+```bash
+# مک‌های مجهز به تراشه اپل (M1/M2/M3/M4):
+tar -xzf hypershare-darwin-arm64.tar.gz
+./hypershare
+
+# مک‌های مجهز به پردازنده اینتل:
+tar -xzf hypershare-darwin-amd64.tar.gz
+./hypershare
+```
+
+### 🪟 ۶. سیستم‌عامل ویندوز (Windows x64 & ARM64)
+- فایل `HyperShare-Windows-x86_64.zip` یا `HyperShare_PC.exe` را دانلود کرده و با دوبار کلیک اجرا کنید.
+- برای پردازنده‌های نسل جدید آرم (مانند Snapdragon X Elite)، بسته `HyperShare-Windows-arm64.zip` در دسترس است.
+
+### 📱 ۷. سیستم‌عامل اندروید (Android APK & Play Store)
+- بسته نصبی امضا شده مستقیم: `app-release.apk`
+- بسته فروشگاه گوگل‌پلی: `app-release.aab`

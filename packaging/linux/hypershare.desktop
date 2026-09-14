@@ -1,0 +1,14 @@
+﻿[Desktop Entry]
+Version=1.0
+Type=Application
+Name=HyperShare
+GenericName=Offline P2P File Transfer
+Comment=Ultra-fast 5GHz local P2P file sharing system
+Comment[fa]=سیستم انتقال فایل فوق‌سریع آفلاین P2P با سرعت فضایی
+Exec=/usr/bin/hypershare
+Icon=hypershare
+Terminal=false
+StartupNotify=true
+Categories=Network;FileTransfer;P2P;Utility;
+Keywords=share;transfer;wifi;p2p;offline;turbo;zapya;shareit;
+MimeType=x-scheme-handler/hypershare;

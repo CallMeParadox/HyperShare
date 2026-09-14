@@ -1,0 +1,29 @@
+﻿# Maintainer: CallMeParadox <https://github.com/CallMeParadox>
+pkgname=hypershare-bin
+pkgver=1.1.3
+pkgrel=1
+pkgdesc="Ultra-fast 5GHz offline P2P file sharing system (Desktop & Web)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/CallMeParadox/HyperShare"
+license=('MIT')
+depends=('glibc')
+optdepends=(
+    'zenity: GUI file picker support on GTK desktops'
+    'kdialog: GUI file picker support on KDE Plasma desktops'
+    'xdg-utils: Open browser and file manager automatically'
+)
+provides=('hypershare')
+conflicts=('hypershare')
+
+source_x86_64=("https://github.com/CallMeParadox/HyperShare/releases/download/v${pkgver}/hypershare-linux-amd64.tar.gz")
+source_aarch64=("https://github.com/CallMeParadox/HyperShare/releases/download/v${pkgver}/hypershare-linux-arm64.tar.gz")
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+    install -Dm755 "${srcdir}/hypershare" "${pkgdir}/usr/bin/hypershare"
+    install -Dm644 "${srcdir}/hypershare.desktop" "${pkgdir}/usr/share/applications/hypershare.desktop"
+    install -Dm644 "${srcdir}/hypershare.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/hypershare.svg"
+    install -Dm644 "${srcdir}/hypershare.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/hypershare.png"
+    install -Dm644 "${srcdir}/hypershare.service" "${pkgdir}/usr/lib/systemd/user/hypershare.service"
+}

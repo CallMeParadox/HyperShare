@@ -1,0 +1,27 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1117;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#161b22;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="lightningGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffea00;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff9100;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00f2fe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4facfe;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <!-- Background rounded rectangle -->
+  <rect width="512" height="512" rx="110" fill="url(#grad1)" stroke="#30363d" stroke-width="8"/>
+  <!-- Wi-Fi Pulse Rings -->
+  <path d="M 156 160 A 180 180 0 0 1 356 160" fill="none" stroke="url(#ringGrad)" stroke-width="20" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 196 200 A 130 130 0 0 1 316 200" fill="none" stroke="url(#ringGrad)" stroke-width="20" stroke-linecap="round" opacity="0.85"/>
+  <!-- Glowing Turbo Lightning Bolt -->
+  <path d="M 280 120 L 190 280 L 260 280 L 230 400 L 330 240 L 260 240 Z" fill="url(#lightningGrad)" filter="url(#glow)"/>
+</svg>

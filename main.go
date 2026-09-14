@@ -19,8 +19,6 @@ import (
 	"time"
 
 	"hypershare/engine"
-
-	"github.com/jchv/go-webview2"
 )
 
 //go:embed web/*
@@ -101,49 +99,26 @@ func main() {
 	mux.HandleFunc("/api/files", engine.HandleFilesList(absDir))
 	mux.HandleFunc("/api/files/delete", engine.HandleFileDelete(absDir))
 
-	// Windows PC File Dialog API
+	// Desktop File Dialog API (Cross-Platform)
 	mux.HandleFunc("/api/pick-pc-files", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method == http.MethodOptions {
 			return
 		}
-
-		psScript := `[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $f = New-Object System.Windows.Forms.OpenFileDialog; $f.Multiselect = $true; $f.Title = 'انتخاب فایل‌ها برای اشتراک در هایپرشیر'; if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $f.FileNames | ForEach-Object { [Console]::WriteLine($_) } }`
-		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-STA", "-Command", psScript)
-		out, err := cmd.Output()
-		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"status": "error", "count": 0, "message": err.Error()})
-			return
-		}
-
-		lines := strings.Split(strings.TrimSpace(string(out)), "\r\n")
-		count := 0
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			dest := filepath.Join(absDir, filepath.Base(line))
-			if copyFile(line, dest) == nil {
-				count++
-			}
-		}
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "count": count})
+		handlePickFilesPlatform(w, r, absDir)
 	})
 
-	// Windows Explorer Open Folder API
+	// Desktop Open Folder API (Cross-Platform)
 	mux.HandleFunc("/api/open-folder", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
-		if runtime.GOOS == "windows" {
-			folder := r.URL.Query().Get("type")
-			target := absUpload
-			if folder == "shared" {
-				target = absDir
-			}
-			exec.Command("explorer.exe", target).Start()
+		folder := r.URL.Query().Get("type")
+		target := absUpload
+		if folder == "shared" {
+			target = absDir
 		}
+		handleOpenFolderPlatform(target)
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	})
 
@@ -220,29 +195,8 @@ func main() {
 		}
 	}()
 
-	// Launch Standalone Native Desktop Window (No browser, no console!)
-	opts := webview2.WebViewOptions{
-		Debug: false,
-		WindowOptions: webview2.WindowOptions{
-			Title:  "⚡ HyperShare PC - انتقال پرسرعت بی‌سیم (آفلاین)",
-			Width:  1060,
-			Height: 740,
-			Center: true,
-		},
-	}
-	w := webview2.NewWithOptions(opts)
-	if w != nil {
-		defer w.Destroy()
-		w.Navigate(targetURL)
-		w.Run()
-		// Clean exit when desktop window is closed
-		server.Close()
-		return
-	}
-
-	// Fallback to browser if WebView2 runtime is not available
-	openURL(targetURL)
-	select {}
+	// Launch Native Desktop Window or Browser (Cross-Platform)
+	launchPlatformWindow(targetURL, server)
 }
 
 func openURL(url string) {

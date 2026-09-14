@@ -1,0 +1,15 @@
+﻿[Unit]
+Description=HyperShare Offline 5GHz P2P File Sharing Daemon
+Documentation=https://github.com/CallMeParadox/HyperShare
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hypershare -port 8080 -dir %h/HyperShare/Shared -upload %h/HyperShare/Received
+Restart=on-failure
+RestartSec=3s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=default.target
